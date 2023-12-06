@@ -1,4 +1,4 @@
-
+#include <time.h>
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
 
 typedef struct remote_char_t
@@ -12,11 +12,11 @@ typedef struct remote_char_t
 
 typedef struct remote_display_t
 {   
-    int msg_type;
     int posx; 
     int posy; 
     char ch;
-    direction_t direction;
+    int score;
+
 }remote_display_t;
 
 

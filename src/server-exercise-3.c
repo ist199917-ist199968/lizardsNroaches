@@ -126,7 +126,7 @@ void scoreboard(ch_info_t char_data[], int n_chars){
     mvprintw(0, WINDOW_SIZE + 1,"Scoreboard");
     //delete previous scoreboard
     for(int i = 0; i < MAX_PLAYERS; i++){
-        mvprintw(i + 2, WINDOW_SIZE + 1,"               ", char_data[i].ch, char_data[i].score);
+        mvprintw(i + 2, WINDOW_SIZE + 1,"               ");
     }
     //print new scoreboard
     for(int i = 0; i < n_chars; i++){
@@ -156,7 +156,7 @@ int main()
         }
     }
     int total_score = 0;
-    ch_info_t char_data[100];
+    ch_info_t char_data[MAX_PLAYERS];
     int n_chars = 0;
     remote_char_t m;
     remote_display_t m2;
@@ -229,6 +229,10 @@ int main()
                             wmove(my_win, pos_x + i, pos_y);
                             waddch(my_win, '.'| A_BOLD);
                             board[pos_y][pos_x + i].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x + i;
+                            m2.posy = pos_y;	
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         board[pos_y][pos_x + i].nlayers++;
                     }else{
@@ -241,11 +245,9 @@ int main()
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
             wrefresh(my_win);	
-            m2.direction = direction;
-            m2.msg_type = m.msg_type;
             m2.ch = ch;
             m2.posx = pos_x;
-            m2.posy = pos_y;		
+            m2.posy = pos_y;	
             zmq_send (publisher, &m2, sizeof(m2), 0);
             }
         }
@@ -265,6 +267,10 @@ int main()
                 board[pos_y][pos_x].ch = ' ';
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win,' ');
+                m2.ch = ' ';
+                m2.posx = pos_x;
+                m2.posy = pos_y;	
+                zmq_send (publisher, &m2, sizeof(m2), 0);
             switch (direction)
             {
             case UP:
@@ -276,18 +282,34 @@ int main()
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x + i].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
@@ -307,18 +329,34 @@ int main()
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x - i].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
@@ -338,18 +376,34 @@ int main()
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y + i][pos_x].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
@@ -369,18 +423,34 @@ int main()
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y - i][pos_x].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
@@ -397,6 +467,8 @@ int main()
                 /* claculates new direction */
                 direction = m.direction;
                 char_data[ch_pos].dir = direction;
+                m2.posx = pos_x;
+                m2.posy = pos_y;
                 /* claculates new mark position */
                 new_position(&pos_x, &pos_y, direction);
                 //collision, don't change position
@@ -439,9 +511,14 @@ int main()
                             wmove(my_win, pos_x + i, pos_y);
                             if(char_data[ch_pos].win == true){
                                 waddch(my_win, '*'| A_BOLD);
+                                m2.ch = '*';
                             }else{
                                 waddch(my_win, '.'| A_BOLD);
+                                m2.ch = '.';
                             }
+                            m2.posx = pos_x + i;
+                            m2.posy = pos_y;	
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         board[pos_y][pos_x + i].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -459,9 +536,14 @@ int main()
                             wmove(my_win, pos_x - i, pos_y);
                             if(char_data[ch_pos].win == true){
                                 waddch(my_win, '*'| A_BOLD);
+                                m2.ch = '*';
                             }else{
                                 waddch(my_win, '.'| A_BOLD);
+                                m2.ch = '.';
                             }
+                            m2.posx = pos_x - i;
+                            m2.posy = pos_y;	
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         board[pos_y][pos_x - i].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -479,9 +561,14 @@ int main()
                             wmove(my_win, pos_x, pos_y + i);
                             if(char_data[ch_pos].win == true){
                                 waddch(my_win, '*'| A_BOLD);
+                                m2.ch = '*';
                             }else{
                                 waddch(my_win, '.'| A_BOLD);
+                                m2.ch = '.';
                             }
+                            m2.posx = pos_x;
+                            m2.posy = pos_y + i;	
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         board[pos_y + i][pos_x].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -499,9 +586,14 @@ int main()
                             wmove(my_win, pos_x, pos_y - i);
                             if(char_data[ch_pos].win == true){
                                 waddch(my_win, '*'| A_BOLD);
+                                m2.ch = '*';
                             }else{
                                 waddch(my_win, '.'| A_BOLD);
+                                m2.ch = '.';
                             }
+                            m2.posx = pos_x;
+                            m2.posy = pos_y - i;	
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         board[pos_y - i][pos_x].nlayers++;    
                         if(char_data[ch_pos].win == true)
@@ -517,38 +609,31 @@ int main()
             /* draw mark on new position */
             board[pos_y][pos_x].ch = ch;
             scoreboard(char_data, n_chars);
+            //send scoreboard
+            m2.posx = 999; //flag for scoreboard
+            m2.posy = n_chars; //send number of characters
+            zmq_send (publisher, &m2, sizeof(m2), 0);
+            for(i = 0; i < n_chars; i++){
+                m2.posx = char_data[i].ch;
+                //m2.ch = (char)(char_data[i].ch + '0');
+                m2.score = char_data[i].score;
+                zmq_send (publisher, &m2, sizeof(m2), 0);
+            }
             refresh();
             box(my_win, 0 , 0);
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
             wrefresh(my_win);	
-            m2.direction = direction;
-            m2.msg_type = m.msg_type;
-            m2.ch = ch;
+            m2.ch = ch;		
             m2.posx = pos_x;
-            m2.posy = pos_y;		
+            m2.posy = pos_y;
             zmq_send (publisher, &m2, sizeof(m2), 0);        
         }
         //remote display joins
         else if(m.msg_type == 2){
-            //send the amount of characters registered in the server
-            m.msg_type = n_chars;
-            zmq_send (responder, &m, sizeof(m), 0);
-            
-            if(n_chars > 0){
-                //send the chars in the server
-                for(i = 0; i < n_chars; i++){
-                    m2.ch = char_data[i].ch;
-                    m2.posx = char_data[i].pos_x,
-                    m2.posy = char_data[i].pos_y;
-                    m2.direction = char_data[i].dir;
-                    zmq_send (publisher, &m2, sizeof(m2), 0);
-                }
-            }else{
-                m2.msg_type = -1;
-                zmq_send (publisher, &m2, sizeof(m2), 0);
-            }
-            zmq_send (publisher, &board, sizeof(board), 0);
+            //send the board with the printed chars
+            zmq_send (responder, &board, sizeof(board), 0);
+
         }
         //cockroach joins
         else if(m.msg_type == 3){
@@ -577,8 +662,7 @@ int main()
                         wmove(my_win, k, l);
                         waddch(my_win, (ch + '0')| A_BOLD);
                         //send to displays
-                        m2.msg_type = m.msg_type;
-                        m2.ch = ch;
+                        m2.ch = (char)(ch + '0');
                         m2.posx = k;
                         m2.posy = l;		
                         zmq_send (publisher, &m2, sizeof(m2), 0);
@@ -614,18 +698,34 @@ int main()
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 8){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '*'| A_BOLD);
-                                board[pos_y][pos_x].ch = '*';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 9){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '.'| A_BOLD);
-                                board[pos_y][pos_x].ch = '.';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
                             board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_x--;
                     }
@@ -637,18 +737,34 @@ int main()
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 8){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '*'| A_BOLD);
-                                board[pos_y][pos_x].ch = '*';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 9){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '.'| A_BOLD);
-                                board[pos_y][pos_x].ch = '.';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
                             board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_x++;
                     }
@@ -660,18 +776,34 @@ int main()
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 8){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '*'| A_BOLD);
-                                board[pos_y][pos_x].ch = '*';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 9){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '.'| A_BOLD);
-                                board[pos_y][pos_x].ch = '.';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
                             board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_y--;
                     }
@@ -683,18 +815,34 @@ int main()
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 8){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '*'| A_BOLD);
-                                board[pos_y][pos_x].ch = '*';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else if(under == 9){
-                                wmove(my_win, pos_x, pos_y);
-                                waddch(my_win, '.'| A_BOLD);
-                                board[pos_y][pos_x].ch = '.';
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
                             board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_y++;
                     }
@@ -710,6 +858,10 @@ int main()
                 //print new position
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win, (ch + '0')| A_BOLD);
+                m2.ch = (char)(ch + '0');
+                m2.posx = pos_x;
+                m2.posy = pos_y;		
+                zmq_send (publisher, &m2, sizeof(m2), 0);
             }
             }
             wrefresh(my_win);
@@ -727,6 +879,10 @@ int main()
             board[pos_y][pos_x].ch = ' ';
             wmove(my_win, pos_x, pos_y);
             waddch(my_win,' ');
+            m2.ch = ' ';
+            m2.posx = pos_x;
+            m2.posy = pos_y;		
+            zmq_send (publisher, &m2, sizeof(m2), 0);
             //delete from board
             switch (direction)
             {
@@ -739,18 +895,34 @@ int main()
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x + i].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
@@ -770,18 +942,34 @@ int main()
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x - i].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
@@ -801,18 +989,34 @@ int main()
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y + i][pos_x].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
@@ -832,18 +1036,34 @@ int main()
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
+                                m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '*';
+                                m2.ch = '*';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '.';
+                                m2.ch = '.';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y - i][pos_x].ch = under;
+                                m2.ch = (char)(under + '0');
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;		
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;
@@ -868,6 +1088,16 @@ int main()
             }
             n_chars--;
             scoreboard(char_data, n_chars);
+            //send scoreboard
+            m2.posx = 999; //flag for scoreboard
+            m2.posy = n_chars; //send number of characters
+            zmq_send (publisher, &m2, sizeof(m2), 0);
+            for(i = 0; i < n_chars; i++){
+                m2.posx = char_data[i].ch;
+                //m2.ch = (char)(char_data[i].ch + '0');
+                m2.score = char_data[i].score;
+                zmq_send (publisher, &m2, sizeof(m2), 0);
+            }
             refresh();
             box(my_win, 0 , 0);
             wrefresh(my_win);
