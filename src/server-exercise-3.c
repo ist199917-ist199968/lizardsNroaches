@@ -31,7 +31,8 @@ typedef struct board_t
     int ch;
     //number of characters overlaying each other
     int nlayers;
-    //TODO: winning layers underneath '*'
+    //winning layers underneath '*'
+    int wlayers;
 } board_t;
 
 
@@ -47,16 +48,18 @@ typedef struct cockroach_info_t
 } cockroach_info_t;
 
 //find what's under
-int what_under(int nlayers, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid){
+int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid, bool is_winner){
     
     int under = 0;
     //draw tail flag is 999
-    if(nlayers == 1 && cockid == 999){
+    if(board.nlayers == 1 && cockid == 999){
         under =  0;
     //cockroach draw
-    }else if(nlayers > 0){
+    }else if(board.nlayers > 0){
         //found lizard body
-        under = 9;
+        if(((board.wlayers) == board.nlayers && cockid == 999 && is_winner == true) || ((board.wlayers+1) == board.nlayers && cockid == 999 && is_winner == false) || ((board.wlayers) == board.nlayers && cockid != 999)){ //send '*'
+            under = 8;
+        }else{ under = 9;} //send '.'
     }
     for(int i = 0; i < MAX_COCK; i++){
         //found cockroach under
@@ -149,6 +152,7 @@ int main()
         for (int b = 0; b < WINDOW_SIZE-1; b++) {
             board[a][b].ch = ' ';    
             board[a][b].nlayers = 0; 
+            board[a][b].wlayers = 0; 
         }
     }
     int total_score = 0;
@@ -213,7 +217,7 @@ int main()
             char_data[n_chars].pos_x = pos_x;
             char_data[n_chars].pos_y = pos_y;
             char_data[n_chars].score = 0;
-            char_data[n_chars].win = 0;
+            char_data[n_chars].win = false;
             board[pos_y][pos_x].ch = ch;
 
             //initiate lizard going up
@@ -247,13 +251,14 @@ int main()
         }
         //lizard movement message
         else if(m.msg_type == 1){
-            
+            //check if current ch_pos is a winner
+            bool winner = false;
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
             if(ch_pos != -1){
                 pos_x = char_data[ch_pos].pos_x;
                 pos_y = char_data[ch_pos].pos_y;
                 ch = char_data[ch_pos].ch;
-
+                winner = char_data[ch_pos].win;
                 //load old direction
                 direction = char_data[ch_pos].dir;
                 /*deletes old place */
@@ -266,11 +271,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x + i].nlayers, pos_x + i, pos_y, cock_data, 999);
+                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x + i].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -282,6 +291,8 @@ int main()
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x + i].wlayers--;
                     }else{
                         break;
                     }
@@ -291,11 +302,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x - i].nlayers, pos_x - i, pos_y, cock_data, 999);
+                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x - i].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -307,6 +322,8 @@ int main()
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x - i].wlayers--;
                     }else{
                         break;
                     }
@@ -316,11 +333,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 46){  
-                            under = what_under(board[pos_y + i][pos_x].nlayers, pos_x, pos_y + i, cock_data, 999);
+                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y + i][pos_x].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -332,6 +353,8 @@ int main()
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y + i][pos_x].wlayers--;
                     }else{
                         break;
                     }
@@ -341,11 +364,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 46){
-                            under = what_under(board[pos_y - i][pos_x].nlayers, pos_x, pos_y - i, cock_data, 999);
+                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y - i][pos_x].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -357,6 +384,8 @@ int main()
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y - i][pos_x].wlayers--;
                     }else{
                         break;
                     }
@@ -365,7 +394,6 @@ int main()
             default:
                 break;
             }
-
                 /* claculates new direction */
                 direction = m.direction;
                 char_data[ch_pos].dir = direction;
@@ -393,6 +421,9 @@ int main()
                         }
                     }
                 }
+                //winning
+                if(char_data[ch_pos].score >= 50)
+                    char_data[ch_pos].win = true;
                 //send score back to lizard
                 m.ncock = char_data[ch_pos].score;
                 zmq_send (responder, &m, sizeof(m), 0);
@@ -406,9 +437,15 @@ int main()
                         if(board[pos_y][pos_x + i].ch <= 32){
                             board[pos_y][pos_x + i].ch = '.';
                             wmove(my_win, pos_x + i, pos_y);
-                            waddch(my_win, '.'| A_BOLD);
+                            if(char_data[ch_pos].win == true){
+                                waddch(my_win, '*'| A_BOLD);
+                            }else{
+                                waddch(my_win, '.'| A_BOLD);
+                            }
                         }
                         board[pos_y][pos_x + i].nlayers++;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x + i].wlayers++;
                     }else{
                         break;
                     }
@@ -420,9 +457,15 @@ int main()
                         if(board[pos_y][pos_x - i].ch <= 32){
                             board[pos_y][pos_x - i].ch = '.';
                             wmove(my_win, pos_x - i, pos_y);
-                            waddch(my_win, '.'| A_BOLD);
+                            if(char_data[ch_pos].win == true){
+                                waddch(my_win, '*'| A_BOLD);
+                            }else{
+                                waddch(my_win, '.'| A_BOLD);
+                            }
                         }
                         board[pos_y][pos_x - i].nlayers++;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x - i].wlayers++;
                     }else{
                         break;
                     }
@@ -434,9 +477,15 @@ int main()
                         if(board[pos_y + i][pos_x].ch <= 32){    
                             board[pos_y + i][pos_x].ch = '.';
                             wmove(my_win, pos_x, pos_y + i);
-                            waddch(my_win, '.'| A_BOLD);
+                            if(char_data[ch_pos].win == true){
+                                waddch(my_win, '*'| A_BOLD);
+                            }else{
+                                waddch(my_win, '.'| A_BOLD);
+                            }
                         }
                         board[pos_y + i][pos_x].nlayers++;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y + i][pos_x].wlayers++;
                     }else{
                         break;
                     }
@@ -448,9 +497,15 @@ int main()
                         if(board[pos_y - i][pos_x].ch <= 32){
                             board[pos_y - i][pos_x].ch = '.';
                             wmove(my_win, pos_x, pos_y - i);
-                            waddch(my_win, '.'| A_BOLD);
+                            if(char_data[ch_pos].win == true){
+                                waddch(my_win, '*'| A_BOLD);
+                            }else{
+                                waddch(my_win, '.'| A_BOLD);
+                            }
                         }
                         board[pos_y - i][pos_x].nlayers++;    
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y - i][pos_x].wlayers++;
                     }else{
                         break;
                     }
@@ -501,7 +556,7 @@ int main()
             ncock = m.ncock;
             //check if there is no more space for cockroaches
             if(total_cock + ncock > MAX_COCK){
-                //TODO: send: "too many cockroaches" and close(?) the client
+                //"too many cockroaches" and close the client
                 m.ncock = 0;
                 zmq_send (responder, &m, sizeof(m), 0);
             }else{                
@@ -542,6 +597,7 @@ int main()
         else if(m.msg_type == 4){
             ncock = m.ncock;
             fcock = m.ch;
+            bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data
                 pos_x = cock_data[fcock + i].posx;
@@ -553,11 +609,15 @@ int main()
                 {
                 case UP:
                     if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch <= 46){
-                        under = what_under(board[pos_y][pos_x].nlayers, pos_x, pos_y, cock_data, fcock + i);
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                        }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x].ch = '*';
                         }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -572,11 +632,15 @@ int main()
                     break;
                 case DOWN:
                     if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch <= 46){
-                        under = what_under(board[pos_y][pos_x].nlayers, pos_x, pos_y, cock_data, fcock + i);
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                        }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x].ch = '*';
                         }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -591,11 +655,15 @@ int main()
                     break;
                 case LEFT:
                     if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch <= 46){
-                        under = what_under(board[pos_y][pos_x].nlayers, pos_x, pos_y, cock_data, fcock + i);
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                        }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x].ch = '*';
                         }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -610,11 +678,15 @@ int main()
                     break;
                 case RIGHT:
                     if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch <= 46){
-                        under = what_under(board[pos_y][pos_x].nlayers, pos_x, pos_y, cock_data, fcock + i);
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
                             board[pos_y][pos_x].ch = ' ';
+                        }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x].ch = '*';
                         }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -647,6 +719,7 @@ int main()
         else if(m.msg_type ==5){
             zmq_send (responder, &m, sizeof(m), 0);
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
+            bool winner = char_data[ch_pos].win;
             pos_x = char_data[ch_pos].pos_x;
             pos_y = char_data[ch_pos].pos_y;
             ch = char_data[ch_pos].ch;
@@ -661,11 +734,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x + i].nlayers, pos_x + i, pos_y, cock_data, 999);
+                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x + i].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -677,6 +754,8 @@ int main()
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x + i].wlayers--;
                     }else{
                         break;
                     }
@@ -686,11 +765,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x - i].nlayers, pos_x - i, pos_y, cock_data, 999);
+                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y][pos_x - i].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -702,6 +785,8 @@ int main()
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y][pos_x - i].wlayers--;
                     }else{
                         break;
                     }
@@ -711,11 +796,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 46){  
-                            under = what_under(board[pos_y + i][pos_x].nlayers, pos_x, pos_y + i, cock_data, 999);
+                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y + i][pos_x].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -727,6 +816,8 @@ int main()
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y + i][pos_x].wlayers--;
                     }else{
                         break;
                     }
@@ -736,11 +827,15 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 46){
-                            under = what_under(board[pos_y - i][pos_x].nlayers, pos_x, pos_y - i, cock_data, 999);
+                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, 999, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
+                            }else if(under == 8){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, '*'| A_BOLD);
+                                board[pos_y - i][pos_x].ch = '*';
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -751,7 +846,9 @@ int main()
                                 board[pos_y - i][pos_x].ch = under;
                             }
                         }
-                        board[pos_y - i][pos_x].nlayers--;    
+                        board[pos_y - i][pos_x].nlayers--;
+                        if(char_data[ch_pos].win == true)
+                            board[pos_y - i][pos_x].wlayers--;    
                     }else{
                         break;
                     }
