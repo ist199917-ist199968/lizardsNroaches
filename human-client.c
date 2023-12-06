@@ -33,69 +33,74 @@ int main()
     m.direction = 0;
     zmq_send (requester, &m, sizeof(m), 0);
     
-    //receive the assigned letter from the server
+    //receive the assigned letter from the server or flag that is full
     zmq_recv (requester, &m, sizeof(m), 0);
     ch = m.ch;
-
+    if(ch == 0){
+        printf("Tamos cheios :/\n");
+        return 0;
+    }
 	initscr();			/* Start curses mode 		*/
 	cbreak();				/* Line buffering disabled	*/
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
 	noecho();			/* Don't echo() while we do getch */
 
     int n = 0;
-
+    mvprintw(0,0,"Player %c", ch);
     // prepare the movement message
     m.msg_type = 1;
     m.ch = ch;
-    int key;
-    do
-    {
+    int key, score = 0;
+    while(1){
     	key = getch();	
         n++;
 
-        //TODO: case q or Q is pressed, disconnect from server
         switch (key)
         {
         case KEY_LEFT:
-            mvprintw(0,0,"%d Left arrow is pressed", n);
+            mvprintw(3,0,"%d Left arrow is pressed", n);
             // prepare the movement message
            m.direction = LEFT;
             break;
         case KEY_RIGHT:
-            mvprintw(0,0,"%d Right arrow is pressed", n);
+            mvprintw(3,0,"%d Right arrow is pressed", n);
             // prepare the movement message
             m.direction = RIGHT;
             break;
         case KEY_DOWN:
-            mvprintw(0,0,"%d Down arrow is pressed", n);
+            mvprintw(3,0,"%d Down arrow is pressed", n);
             // prepare the movement message
            m.direction = DOWN;
             break;
         case KEY_UP:
-            mvprintw(0,0,"%d :Up arrow is pressed", n);
+            mvprintw(3,0,"%d :Up arrow is pressed", n);
             // prepare the movement message
             m.direction = UP;
             break;
-        /*
+        
         case 'q':
         case 'Q':
-            mvprintw(0,0,"%d :exit", n);
-            //TODO: make a new msg_type to disconnect from the server
+            m.msg_type = 5;
+            zmq_send (requester, &m, sizeof(m), 0);
+            zmq_recv (requester, &m, sizeof(m), 0);
+            return 0;
             break;
-        */
+        
         default:
             key = 'x'; 
             break;
         }
 
         //send the movement message
-         if (key != 'x'){
+        if (key != 'x'){
             zmq_send (requester, &m, sizeof(m), 0);
-            //TODO: receive score and display it
+            //receive score and display it
             zmq_recv (requester, &m, sizeof(m), 0);
+            score = m.ncock;
+            mvprintw(1,0,"Score - %d", score);
         }
         refresh();			/* Print it on to the real screen */
-    }while(key != 27);
+    };
     
 
     zmq_close (requester);

@@ -33,6 +33,13 @@ int main()
     m.ncock = ncock;
     zmq_send (requester, &m, sizeof(m), 0);
     zmq_recv (requester, &m, sizeof(m), 0);
+
+    //board already full of cockroaches
+    if(m.ncock == 0){
+        printf("Tamos cheios :/\n");
+        return 0;
+    }
+
     //load the message information, m.ch is the first position
     m.msg_type = 4;
 

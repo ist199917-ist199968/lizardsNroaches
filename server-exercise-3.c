@@ -11,6 +11,7 @@
 
 #define WINDOW_SIZE 30 
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
+#define MAX_PLAYERS 26
 
 time_t start_time;
 
@@ -19,6 +20,7 @@ typedef struct ch_info_t
     int ch;
     int pos_x, pos_y;
     int score;
+    int win;
     direction_t dir;
 } ch_info_t;
 
@@ -28,7 +30,7 @@ typedef struct board_t
     int ch;
     //number of characters overlaying each other
     int nlayers;
-    
+    //TODO: winning layers underneath '*'
 } board_t;
 
 
@@ -39,7 +41,7 @@ typedef struct cockroach_info_t
     //cockroach position
     int posx;
     int posy;
-    //TODO: include sleep
+    //time it was eaten
     time_t time_eaten;
 } cockroach_info_t;
 
@@ -47,7 +49,7 @@ typedef struct cockroach_info_t
 int what_under(int nlayers, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid){
     
     int under = 0;
-    //draw tail flag 999
+    //draw tail flag is 999
     if(nlayers == 1 && cockid == 999){
         under =  0;
     //cockroach draw
@@ -122,6 +124,11 @@ int available_char(int n_chars, int ch, ch_info_t char_data[]){
 
 void scoreboard(ch_info_t char_data[], int n_chars){
     mvprintw(0, WINDOW_SIZE + 1,"Scoreboard");
+    //delete previous scoreboard
+    for(int i = 0; i < MAX_PLAYERS; i++){
+        mvprintw(i + 2, WINDOW_SIZE + 1,"               ", char_data[i].ch, char_data[i].score);
+    }
+    //print new scoreboard
     for(int i = 0; i < n_chars; i++){
         mvprintw(i + 2, WINDOW_SIZE + 1,"%c score: %2d", char_data[i].ch, char_data[i].score);
     }
@@ -173,7 +180,6 @@ int main()
     WINDOW * my_win = newwin(WINDOW_SIZE, WINDOW_SIZE, 0, 0);
     box(my_win, 0 , 0);	
 	wrefresh(my_win);
-    //TODO: scoreboard
 
     int ch;
     int pos_x;
@@ -187,8 +193,11 @@ int main()
         
         //new lizard character joins
         if(m.msg_type == 0){
-            //TODO: max players
-            
+            //max players
+            if(n_chars == MAX_PLAYERS){
+                m.ch = 0;
+                zmq_send (responder, &m, sizeof(m), 0);
+            }else{
             //check if character is already in char_data
             ch = m.ch;          
             ch = available_char(n_chars, ch, char_data);
@@ -207,6 +216,7 @@ int main()
             char_data[n_chars].pos_x = pos_x;
             char_data[n_chars].pos_y = pos_y;
             char_data[n_chars].score = 0;
+            char_data[n_chars].win = 0;
             board[pos_y][pos_x].ch = ch;
 
             //initiate lizard going up
@@ -236,11 +246,10 @@ int main()
             m2.posx = pos_x;
             m2.posy = pos_y;		
             zmq_send (publisher, &m2, sizeof(m2), 0);
+            }
         }
         //lizard movement message
         else if(m.msg_type == 1){
-            //TODO: send score back to lizard
-            zmq_send (responder, &m, sizeof(m), 0);
             
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
             if(ch_pos != -1){
@@ -387,6 +396,9 @@ int main()
                         }
                     }
                 }
+                //send score back to lizard
+                m.ncock = char_data[ch_pos].score;
+                zmq_send (responder, &m, sizeof(m), 0);
             }
             //draw lizard tail
             switch (direction)
@@ -493,6 +505,8 @@ int main()
             //check if there is no more space for cockroaches
             if(total_cock + ncock > MAX_COCK){
                 //TODO: send: "too many cockroaches" and close(?) the client
+                m.ncock = 0;
+                zmq_send (responder, &m, sizeof(m), 0);
             }else{                
                 //random position for each cockroach
                 i = 0;
@@ -631,7 +645,141 @@ int main()
             }
             wrefresh(my_win);
             zmq_send (responder, &m, sizeof(m), 0);
+        } 
+        //lizard disconnect
+        else if(m.msg_type ==5){
+            zmq_send (responder, &m, sizeof(m), 0);
+            int ch_pos = find_ch_info(char_data, n_chars, m.ch);
+            pos_x = char_data[ch_pos].pos_x;
+            pos_y = char_data[ch_pos].pos_y;
+            ch = char_data[ch_pos].ch;
+            direction = char_data[ch_pos].dir;
+            board[pos_y][pos_x].ch = ' ';
+            wmove(my_win, pos_x, pos_y);
+            waddch(my_win,' ');
+            //delete from board
+            switch (direction)
+            {
+            case UP:
+                for(i = 1; i <= 5; i++){
+                    if(pos_x + i < WINDOW_SIZE-1){
+                        if(board[pos_y][pos_x + i].ch <= 46){
+                            under = what_under(board[pos_y][pos_x + i].nlayers, pos_x + i, pos_y, cock_data, 999);
+                            if(under == 0){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, ' ');
+                                board[pos_y][pos_x + i].ch = ' ';
+                            }else if(under == 9){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, '.'| A_BOLD);
+                                board[pos_y][pos_x + i].ch = '.';
+                            }else{
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, (under + '0')| A_BOLD);
+                                board[pos_y][pos_x + i].ch = under;
+                            }
+                        }    
+                        board[pos_y][pos_x + i].nlayers--;
+                    }else{
+                        break;
+                    }
+                }
+                break;
+            case DOWN:
+                for(i = 1; i <= 5; i++){
+                    if(pos_x - i > 0){
+                        if(board[pos_y][pos_x - i].ch <= 46){
+                            under = what_under(board[pos_y][pos_x - i].nlayers, pos_x - i, pos_y, cock_data, 999);
+                            if(under == 0){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, ' ');
+                                board[pos_y][pos_x - i].ch = ' ';
+                            }else if(under == 9){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, '.'| A_BOLD);
+                                board[pos_y][pos_x - i].ch = '.';
+                            }else{
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, (under + '0')| A_BOLD);
+                                board[pos_y][pos_x - i].ch = under;
+                            }
+                        }
+                        board[pos_y][pos_x - i].nlayers--;
+                    }else{
+                        break;
+                    }
+                }
+                break;
+            case LEFT:
+                for(i = 1; i <= 5; i++){
+                    if(pos_y + i < WINDOW_SIZE-1){
+                        if(board[pos_y + i][pos_x].ch <= 46){  
+                            under = what_under(board[pos_y + i][pos_x].nlayers, pos_x, pos_y + i, cock_data, 999);
+                            if(under == 0){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, ' ');
+                                board[pos_y + i][pos_x].ch = ' ';
+                            }else if(under == 9){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, '.'| A_BOLD);
+                                board[pos_y + i][pos_x].ch = '.';
+                            }else{
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, (under + '0')| A_BOLD);
+                                board[pos_y + i][pos_x].ch = under;
+                            }
+                        }
+                        board[pos_y + i][pos_x].nlayers--;
+                    }else{
+                        break;
+                    }
+                }
+                break;
+            case RIGHT:
+                for(i = 1; i <= 5; i++){
+                    if(pos_y - i > 0){
+                        if(board[pos_y - i][pos_x].ch <= 46){
+                            under = what_under(board[pos_y - i][pos_x].nlayers, pos_x, pos_y - i, cock_data, 999);
+                            if(under == 0){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, ' ');
+                                board[pos_y - i][pos_x].ch = ' ';
+                            }else if(under == 9){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, '.'| A_BOLD);
+                                board[pos_y - i][pos_x].ch = '.';
+                            }else{
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, (under + '0')| A_BOLD);
+                                board[pos_y - i][pos_x].ch = under;
+                            }
+                        }
+                        board[pos_y - i][pos_x].nlayers--;    
+                    }else{
+                        break;
+                    }
+                }
+                break;
+            default:
+                break;
+            }
+            //remove from char_data, reduce the index of every lizard that comes after it
+            for(i = ch_pos; i <= (n_chars-2); i++){
+                char_data[i].ch = char_data[i+1].ch;
+                char_data[i].pos_x = char_data[i+1].pos_x;
+                char_data[i].pos_y = char_data[i+1].pos_y;
+                char_data[i].dir = char_data[i+1].dir;
+                char_data[i].score = char_data[i+1].score;
+                char_data[i].win = char_data[i+1].win;;
+            }
+            n_chars--;
+            scoreboard(char_data, n_chars);
+            refresh();
+            box(my_win, 0 , 0);
+            wrefresh(my_win);
         }
+
+        
     }
   	
     zmq_close(publisher);
