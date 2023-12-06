@@ -1,5 +1,6 @@
 #include <zmq.h>
 #include <ncurses.h>
+#include <stdbool.h>
 #include "remote-char.h"
 #include <unistd.h>
 #include <sys/types.h>
@@ -20,7 +21,7 @@ typedef struct ch_info_t
     int ch;
     int pos_x, pos_y;
     int score;
-    int win;
+    bool win;
     direction_t dir;
 } ch_info_t;
 
@@ -68,11 +69,7 @@ int what_under(int nlayers, int posx, int posy, cockroach_info_t cock_data[MAX_C
     return under;
 }
 
-direction_t random_direction(){
-    return  random()%4;
-
-}
-    void new_position(int* x, int *y, direction_t direction){
+void new_position(int* x, int *y, direction_t direction){
         switch (direction)
         {
         case UP:
