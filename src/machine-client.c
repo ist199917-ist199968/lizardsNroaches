@@ -12,7 +12,7 @@
 
 int main()
 {	 
-
+    srand((unsigned int) time(NULL));
     void *context = zmq_ctx_new ();
     void *requester = zmq_socket (context, ZMQ_REQ);
     zmq_connect (requester, "tcp://127.0.0.1:5610");
@@ -46,15 +46,18 @@ int main()
     int sleep_delay;
     direction_t direction;
     int n = 0;
+    int move;
     while (1)
     {
         n++;
         sleep_delay = random()%700000;
         usleep(sleep_delay);
-        sleep(3);
 
         for(int  i = 0; i < ncock; i++){
+            move = random()%2;
+            if(move == 1){
             direction = random()%4;
+
             switch (direction)
             {
             case LEFT:
@@ -73,6 +76,9 @@ int main()
                 mvprintw(0,0,"%d Going Up    \n", n);
                 m.cockdir[i] = direction;
                 break;
+            }
+            }else{
+                m.cockdir[i] = 5;
             }
         }
         refresh();

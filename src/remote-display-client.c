@@ -45,7 +45,7 @@ int main()
 
     void *context2 = zmq_ctx_new ();
     void *subscriber = zmq_socket (context, ZMQ_SUB);
-    int rc = zmq_connect (subscriber, "tcp://127.0.0.2:5620");
+    int rc = zmq_connect (subscriber, "tcp://127.0.0.1:5620");
     assert (rc == 0);
     rc = zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
     assert (rc == 0);
@@ -101,7 +101,6 @@ int main()
             wrefresh(my_win);
         }   
     }
-
     
     zmq_close (subscriber);
     zmq_close (requester);

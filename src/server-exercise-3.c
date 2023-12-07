@@ -146,6 +146,7 @@ int find_ch_info(ch_info_t char_data[], int n_char, int ch){
 
 int main()
 {	
+    srand((unsigned int) time(NULL));
     //matrix with everything drawn
     board_t board[WINDOW_SIZE-1][WINDOW_SIZE-1];
     for (int a = 0; a < WINDOW_SIZE-1; a++) {
@@ -169,7 +170,7 @@ int main()
 
     void *context2 = zmq_ctx_new ();
     void *publisher = zmq_socket (context2, ZMQ_PUB);
-    int rc2 = zmq_bind (publisher, "tcp://127.0.0.2:5620");
+    int rc2 = zmq_bind (publisher, "tcp://127.0.0.1:5620");
     assert(rc2 == 0);
 
 	initscr();		    	
@@ -478,6 +479,10 @@ int main()
                     total_score = char_data[ch_pos].score + char_data[i].score;
                     char_data[ch_pos].score = total_score/2;
                     char_data[i].score = total_score/2;
+
+                    if(char_data[i].score >= 50)
+                        char_data[i].win = true;
+
                     //don't change position
                     pos_x = char_data[ch_pos].pos_x;
                     pos_y = char_data[ch_pos].pos_y;
@@ -490,12 +495,15 @@ int main()
                         if(cock_data[i].posx == pos_x && cock_data[i].posy == pos_y && (time(&start_time)-cock_data[i].time_eaten)>=5){
                             char_data[ch_pos].score += cock_data[i].value;
                             cock_data[i].time_eaten = time(&start_time);
+                            cock_data[i].posx = random()%(WINDOW_SIZE-2) + 1;
+                            cock_data[i].posy = random()%(WINDOW_SIZE-2) + 1;
                         }
                     }
                 }
                 //winning
                 if(char_data[ch_pos].score >= 50)
                     char_data[ch_pos].win = true;
+
                 //send score back to lizard
                 m.ncock = char_data[ch_pos].score;
                 zmq_send (responder, &m, sizeof(m), 0);
@@ -507,12 +515,13 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 32){
-                            board[pos_y][pos_x + i].ch = '.';
                             wmove(my_win, pos_x + i, pos_y);
                             if(char_data[ch_pos].win == true){
+                                board[pos_y][pos_x + i].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
                                 m2.ch = '*';
                             }else{
+                                board[pos_y][pos_x + i].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
                                 m2.ch = '.';
                             }
@@ -532,12 +541,13 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 32){
-                            board[pos_y][pos_x - i].ch = '.';
                             wmove(my_win, pos_x - i, pos_y);
                             if(char_data[ch_pos].win == true){
+                                board[pos_y][pos_x - i].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
                                 m2.ch = '*';
                             }else{
+                                board[pos_y][pos_x - i].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
                                 m2.ch = '.';
                             }
@@ -557,12 +567,13 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 32){    
-                            board[pos_y + i][pos_x].ch = '.';
                             wmove(my_win, pos_x, pos_y + i);
                             if(char_data[ch_pos].win == true){
+                                board[pos_y + i][pos_x].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
                                 m2.ch = '*';
                             }else{
+                                board[pos_y + i][pos_x].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
                                 m2.ch = '.';
                             }
@@ -582,12 +593,13 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 32){
-                            board[pos_y - i][pos_x].ch = '.';
                             wmove(my_win, pos_x, pos_y - i);
                             if(char_data[ch_pos].win == true){
+                                board[pos_y - i][pos_x].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
                                 m2.ch = '*';
                             }else{
+                                board[pos_y - i][pos_x].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
                                 m2.ch = '.';
                             }
