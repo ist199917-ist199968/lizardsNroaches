@@ -5,16 +5,36 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>  
- #include <ctype.h> 
- #include <stdlib.h>
- 
+#include <ctype.h> 
+#include <stdlib.h>
+#include <string.h>
 
-int main()
+int main(int argc, char *argv[])
 {
+    srand((unsigned int) time(NULL));
+
+    if (argc != 3) {
+        printf("Wrong number number of arguments\n");
+        return 1;
+    }
+
+    char *ip = argv[1];
+    char *port1 = argv[2];
+
+    if(!Is_ValidIPv4(ip) || !Is_ValidPort(port1)){
+        printf("ERROR[000]: Incorrect Host-Server data. Check host IPv4 and TCP ports.");
+        exit(1);
+    }
+
+    char *candidate1 = (char*) calloc (1, sizeof(char)*(strlen("tcp://")+strlen(ip) + 1 + strlen(port1) + 1));
+    strcat(candidate1, "tcp://");
+    strcat(candidate1, ip);
+    strcat(candidate1, ":");
+    strcat(candidate1, port1);
 
     void *context = zmq_ctx_new ();
     void *requester = zmq_socket (context, ZMQ_REQ);
-    zmq_connect (requester, "tcp://127.0.0.1:5610");
+    zmq_connect (requester, candidate1);
 
 
     // read the character from the user
@@ -25,12 +45,17 @@ int main()
         ch = tolower(ch);  
     }while(!isalpha(ch));
 
+    char password[50];
+    for(int i = 0; i < 50; i++){
+        password[i] = (char) random()%94 + 32;
+    }
 
     // send connection message
     remote_char_t m;
     m.msg_type = 0;
     m.ch = ch;
     m.direction = 0;
+    strcpy(m.password, password);
     zmq_send (requester, &m, sizeof(m), 0);
     
     //receive the assigned letter from the server or flag that is full
@@ -83,6 +108,7 @@ int main()
             m.msg_type = 5;
             zmq_send (requester, &m, sizeof(m), 0);
             zmq_recv (requester, &m, sizeof(m), 0);
+            free(candidate1);
             return 0;
             break;
         
@@ -102,7 +128,7 @@ int main()
         refresh();			/* Print it on to the real screen */
     };
     
-
+    free(candidate1);
     zmq_close (requester);
     zmq_ctx_destroy (context);
     endwin();			/* End curses mode		  */

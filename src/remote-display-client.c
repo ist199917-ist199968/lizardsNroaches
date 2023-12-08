@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>  
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <time.h>
 
@@ -26,7 +27,7 @@ typedef struct board_t
     int wlayers;
 } board_t;
 
-int main()
+int main(int argc, char *argv[])
 {	
     //matrix with everything drawn
     board_t board[WINDOW_SIZE-1][WINDOW_SIZE-1];
@@ -39,13 +40,38 @@ int main()
 
     remote_char_t m;
 
+    if (argc != 4) {
+        printf("Wrong number number of arguments\n");
+        return 1;
+    }
+
+    char *ip = argv[1];
+    char *port1 = argv[2];
+    char *port2 = argv[3];
+
+    if(!Is_ValidIPv4(ip) || !Is_ValidPort(port1) || !Is_ValidPort(port2)){
+        printf("ERROR[000]: Incorrect Host-Server data. Check host IPv4 and TCP ports.");
+        exit(1);
+    }
+
+    char *candidate1 = (char*) calloc (1, sizeof(char)*(strlen("tcp://")+strlen(ip) + 1 + strlen(port1) + 1));
+    char *candidate2 = (char*) calloc (1, sizeof(char)*(strlen("tcp://")+strlen(ip) + 1 + strlen(port2) + 1));
+    strcat(candidate1, "tcp://");
+    strcat(candidate1, ip);
+    strcat(candidate1, ":");
+    strcat(candidate1, port1);
+    strcat(candidate2, "tcp://");
+    strcat(candidate2, ip);
+    strcat(candidate2, ":");
+    strcat(candidate2, port2);
+
     void *context = zmq_ctx_new ();
     void *requester = zmq_socket (context, ZMQ_REQ);
-    zmq_connect (requester, "tcp://127.0.0.1:5610");
+    zmq_connect (requester, candidate1);
 
     void *context2 = zmq_ctx_new ();
     void *subscriber = zmq_socket (context, ZMQ_SUB);
-    int rc = zmq_connect (subscriber, "tcp://127.0.0.1:5620");
+    int rc = zmq_connect (subscriber, candidate2);
     assert (rc == 0);
     rc = zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
     assert (rc == 0);
@@ -107,5 +133,7 @@ int main()
     zmq_ctx_destroy (context);
     zmq_ctx_destroy (context2);
     endwin();			/* End curses mode		  */
+    free(candidate1);
+    free(candidate2);
 	return 0;
 }

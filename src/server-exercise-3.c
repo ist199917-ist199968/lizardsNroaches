@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <time.h>
+#include <string.h>
 
 #define WINDOW_SIZE 30 
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
@@ -23,6 +24,7 @@ typedef struct ch_info_t
     int score;
     bool win;
     direction_t dir;
+    char password[50];
 } ch_info_t;
 
 typedef struct board_t
@@ -45,19 +47,21 @@ typedef struct cockroach_info_t
     int posy;
     //time it was eaten
     time_t time_eaten;
+    char password[50];
+
 } cockroach_info_t;
 
 //find what's under
 int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid, bool is_winner){
     
     int under = 0;
-    //draw tail flag is 999
-    if(board.nlayers == 1 && cockid == 999){
+    //draw tail flag is -1
+    if(board.nlayers == 1 && cockid == -1){
         under =  0;
     //cockroach draw
     }else if(board.nlayers > 0){
         //found lizard body
-        if(((board.wlayers) == board.nlayers && cockid == 999 && is_winner == true) || ((board.wlayers+1) == board.nlayers && cockid == 999 && is_winner == false) || ((board.wlayers) == board.nlayers && cockid != 999)){ //send '*'
+        if(((board.wlayers) == board.nlayers && cockid == -1 && is_winner == true) || ((board.wlayers+1) == board.nlayers && cockid == -1 && is_winner == false) || ((board.wlayers) == board.nlayers && cockid != -1)){ //send '*'
             under = 8;
         }else{ under = 9;} //send '.'
     }
@@ -144,7 +148,7 @@ int find_ch_info(ch_info_t char_data[], int n_char, int ch){
     return -1;
 }
 
-int main()
+int main(int argc, char *argv[])
 {	
     srand((unsigned int) time(NULL));
     //matrix with everything drawn
@@ -163,14 +167,39 @@ int main()
     remote_display_t m2;
     cockroach_info_t cock_data[MAX_COCK];
 
+    if (argc != 4) {
+        printf("Wrong number number of arguments\n");
+        return 1;
+    }
+
+    char *ip = argv[1];
+    char *port1 = argv[2];
+    char *port2 = argv[3];
+
+    if(!Is_ValidIPv4(ip) || !Is_ValidPort(port1) || !Is_ValidPort(port2)){
+        printf("ERROR[000]: Incorrect Host-Server data. Check host IPv4 and TCP ports.");
+        exit(1);
+    }
+
+    char *candidate1 = (char*) calloc (1, sizeof(char)*(strlen("tcp://")+strlen(ip) + 1 + strlen(port1) + 1));
+    char *candidate2 = (char*) calloc (1, sizeof(char)*(strlen("tcp://")+strlen(ip) + 1 + strlen(port2) + 1));
+    strcat(candidate1, "tcp://");
+    strcat(candidate1, ip);
+    strcat(candidate1, ":");
+    strcat(candidate1, port1);
+    strcat(candidate2, "tcp://");
+    strcat(candidate2, ip);
+    strcat(candidate2, ":");
+    strcat(candidate2, port2);
+
     void *context = zmq_ctx_new ();
     void *responder = zmq_socket (context, ZMQ_REP);
-    int rc = zmq_bind (responder, "tcp://127.0.0.1:5610");
+    int rc = zmq_bind (responder, candidate1);
     assert (rc == 0);
 
     void *context2 = zmq_ctx_new ();
     void *publisher = zmq_socket (context2, ZMQ_PUB);
-    int rc2 = zmq_bind (publisher, "tcp://127.0.0.1:5620");
+    int rc2 = zmq_bind (publisher, candidate2);
     assert(rc2 == 0);
 
 	initscr();		    	
@@ -189,10 +218,24 @@ int main()
     int i, k, l, under;
     int ncock, total_cock = 0, fcock;
     direction_t  direction;
+    bool verify = false;
     while (1)
     {
         zmq_recv (responder, &m, sizeof(m), 0);
-        
+        if(m.msg_type == 1 || m.msg_type == 5){
+            i = find_ch_info(char_data, n_chars, m.ch);
+            if(strcmp(char_data[i].password, m.password) != 0){
+                verify = false;
+                zmq_send (responder, &m, sizeof(m), 0);
+            } else{verify = true;}
+        }else if(m.msg_type == 4){
+            for(i = m.ch; i < (m.ch + m.ncock); i++){
+                if(strcmp(cock_data[i].password, m.password) != 0){
+                    verify = false;
+                    break;
+                }else{verify = true;}
+            }
+        }
         //new lizard character joins
         if(m.msg_type == 0){
             //max players
@@ -204,6 +247,7 @@ int main()
             ch = m.ch;          
             ch = available_char(n_chars, ch, char_data);
             m.ch = ch;
+            strcpy(char_data[n_chars].password, m.password);
             zmq_send (responder, &m, sizeof(m), 0);
             
             //find a free space (it can have a cockroach or a lizard body)
@@ -253,11 +297,12 @@ int main()
             }
         }
         //lizard movement message
-        else if(m.msg_type == 1){
+        else if(m.msg_type == 1 && verify == true){
             //check if current ch_pos is a winner
             bool winner = false;
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
             if(ch_pos != -1){
+
                 pos_x = char_data[ch_pos].pos_x;
                 pos_y = char_data[ch_pos].pos_y;
                 ch = char_data[ch_pos].ch;
@@ -278,7 +323,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, 999, winner);
+                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
@@ -325,7 +370,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, 999, winner);
+                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
@@ -372,7 +417,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 46){  
-                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, 999, winner);
+                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
@@ -419,7 +464,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 46){
-                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, 999, winner);
+                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
@@ -670,6 +715,7 @@ int main()
                         cock_data[total_cock + i].posx = k;
                         cock_data[total_cock + i].posy = l;
                         board[l][k].ch = ch;
+                        strcpy(cock_data[total_cock + i].password, m.password);
                         //print the cockroach
                         wmove(my_win, k, l);
                         waddch(my_win, (ch + '0')| A_BOLD);
@@ -690,7 +736,7 @@ int main()
             }
         }
         //cockroach movement
-        else if(m.msg_type == 4){
+        else if(m.msg_type == 4 && verify == true){
             ncock = m.ncock;
             fcock = m.ch;
             bool winner = false;
@@ -880,7 +926,7 @@ int main()
             zmq_send (responder, &m, sizeof(m), 0);
         } 
         //lizard disconnect
-        else if(m.msg_type ==5){
+        else if(m.msg_type == 5 && verify == true){
             zmq_send (responder, &m, sizeof(m), 0);
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
             bool winner = char_data[ch_pos].win;
@@ -902,7 +948,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, 999, winner);
+                            under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
@@ -949,7 +995,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 46){
-                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, 999, winner);
+                            under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
@@ -996,7 +1042,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 46){  
-                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, 999, winner);
+                            under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
@@ -1043,7 +1089,7 @@ int main()
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 46){
-                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, 999, winner);
+                            under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
@@ -1125,5 +1171,7 @@ int main()
     zmq_ctx_term(context);
     zmq_ctx_term(context2);
     endwin();			/* End curses mode		  */
+    free(candidate1);
+    free(candidate2);
 	return 0;
 }
