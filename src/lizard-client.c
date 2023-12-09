@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     for(int i = 0; i < 50; i++){
         password[i] = (char) random()%94 + 32;
     }
-
+    password[49]='\0';
     // send connection message
     remote_char_t m;
     m.msg_type = 0;

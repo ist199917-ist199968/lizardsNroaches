@@ -162,11 +162,16 @@ int main(int argc, char *argv[])
     }
     int total_score = 0;
     ch_info_t char_data[MAX_PLAYERS];
+    for (int c=0; c<MAX_PLAYERS; c++)
+        memset(char_data[c].password,'\0', sizeof(char_data[c].password));
+    
     int n_chars = 0;
     remote_char_t m;
     remote_display_t m2;
     cockroach_info_t cock_data[MAX_COCK];
-
+    
+    for (int c=0; c<MAX_PLAYERS; c++)
+        memset(cock_data[c].password,'\0', sizeof(cock_data[c].password));
     if (argc != 4) {
         printf("Wrong number number of arguments\n");
         return 1;
@@ -226,6 +231,7 @@ int main(int argc, char *argv[])
             i = find_ch_info(char_data, n_chars, m.ch);
             if(strcmp(char_data[i].password, m.password) != 0){
                 verify = false;
+                printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, m.password);
                 zmq_send (responder, &m, sizeof(m), 0);
             } else{verify = true;}
         }else if(m.msg_type == 4){
@@ -290,6 +296,7 @@ int main(int argc, char *argv[])
             /* draw mark on new position */
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
+            scoreboard(char_data, n_chars);
             wrefresh(my_win);	
             m2.ch = ch;
             m2.posx = pos_x;
@@ -1137,7 +1144,7 @@ int main(int argc, char *argv[])
                 break;
             }
             //remove from char_data, reduce the index of every lizard that comes after it
-            for(i = ch_pos; i <= (n_chars-2); i++){
+            for(i = ch_pos; i <= (n_chars-1); i++){
                 char_data[i].ch = char_data[i+1].ch;
                 char_data[i].pos_x = char_data[i+1].pos_x;
                 char_data[i].pos_y = char_data[i+1].pos_y;
@@ -1145,6 +1152,8 @@ int main(int argc, char *argv[])
                 char_data[i].score = char_data[i+1].score;
                 char_data[i].win = char_data[i+1].win;
                 strcpy(char_data[i].password,char_data[i+1].password);
+                memset(char_data[i+1].password,'\0', sizeof(char_data[i+1].password));
+
             }
             n_chars--;
             scoreboard(char_data, n_chars);
