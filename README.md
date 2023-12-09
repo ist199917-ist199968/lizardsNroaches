@@ -35,15 +35,15 @@ After being eaten a cockroach respawns after a 5 second interval.
 
 To compile all game binaries simply run:
 
-`make`
+```make```
 
 Before re-compiling the game binaries you must:
 
-`make clean`
+```make clean```
 
 The game binaries can be found in the approprietly named `./bin` directory, after compiling, which will have the following tree:
 
-`bin
+```bin
 ├── clients
 │   ├── cockroach
 │   │   └── roaches-client
@@ -52,25 +52,25 @@ The game binaries can be found in the approprietly named `./bin` directory, afte
 ├── remote-display
 │   └── display-app
 └── server
-    └── server`
+    └── server```
 
 ## Run Instructions
 
 ### Server
 
-`./server my_ip my_REQ/REP-port my_PUB/SUB-port`
+```./server my_ip my_REQ/REP-port my_PUB/SUB-port```
 
 ### Lizard
 
-`./lizard-client server_ip server_REQ/REP-port`
+```./lizard-client server_ip server_REQ/REP-port```
 
 ### Roach 
 
-`./roaches-client server_ip server_REQ/REP-port`
+```./roaches-client server_ip server_REQ/REP-port```
 
 ### Remote Display app
 
-`./display-app server_ip server_REQ/REP-port server_PUB/SUB-port`
+```./display-app server_ip server_REQ/REP-port server_PUB/SUB-port```
 
 ## Authors
 
