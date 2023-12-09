@@ -117,7 +117,6 @@ int main(int argc, char *argv[])
 
     zmq_close (requester);
     zmq_ctx_destroy (context);
-    endwin();			/* End curses mode		  */
     free(candidate1);
 	return 0;
 }

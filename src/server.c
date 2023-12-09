@@ -232,6 +232,7 @@ int main(int argc, char *argv[])
             for(i = m.ch; i < (m.ch + m.ncock); i++){
                 if(strcmp(cock_data[i].password, m.password) != 0){
                     verify = false;
+                    zmq_send (responder, &m, sizeof(m), 0);
                     break;
                 }else{verify = true;}
             }
@@ -1142,7 +1143,8 @@ int main(int argc, char *argv[])
                 char_data[i].pos_y = char_data[i+1].pos_y;
                 char_data[i].dir = char_data[i+1].dir;
                 char_data[i].score = char_data[i+1].score;
-                char_data[i].win = char_data[i+1].win;;
+                char_data[i].win = char_data[i+1].win;
+                strcpy(char_data[i].password,char_data[i+1].password);
             }
             n_chars--;
             scoreboard(char_data, n_chars);

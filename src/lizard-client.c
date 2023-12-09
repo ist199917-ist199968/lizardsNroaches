@@ -109,6 +109,7 @@ int main(int argc, char *argv[])
             zmq_send (requester, &m, sizeof(m), 0);
             zmq_recv (requester, &m, sizeof(m), 0);
             free(candidate1);
+            endwin();
             return 0;
             break;
         
