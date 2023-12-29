@@ -51,10 +51,14 @@ typedef struct cockroach_info_t
 
 } cockroach_info_t;
 
-//find what's under
+//find what's under; 0 = blank space, 8 = winner body '*'; 9 = lizard body '.'; value = cockroach value; 7 = wasp 
 int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid, bool is_winner){
     
     int under = 0;
+    //found wasp under
+    if(board.ch == '#'){
+        under = 7;
+    }
     //draw tail flag is -1
     if(board.nlayers == 1 && cockid == -1){
         under =  0;
@@ -65,13 +69,16 @@ int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX
             under = 8;
         }else{ under = 9;} //send '.'
     }
-    for(int i = 0; i < MAX_COCK; i++){
-        //found cockroach under
-        if(cock_data[i].posx == posx && cock_data[i].posy == posy && i != cockid && (time(&start_time)-cock_data[i].time_eaten)>=5){
-            under = cock_data[i].value;
-            break;
+    if(cockid != -2){
+        for(int i = 0; i < MAX_COCK; i++){
+            //found cockroach under
+            if(cock_data[i].posx == posx && cock_data[i].posy == posy && i != cockid && (time(&start_time)-cock_data[i].time_eaten)>=5){
+                under = cock_data[i].value;
+                break;
+            }
         }
     }
+
     //nothing found under
     return under;
 }
@@ -234,7 +241,7 @@ int main(int argc, char *argv[])
                 printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, m.password);
                 zmq_send (responder, &m, sizeof(m), 0);
             } else{verify = true;}
-        }else if(m.msg_type == 4){
+        }else if(m.msg_type == 4 || m.msg_type == 7){
             for(i = m.ch; i < (m.ch + m.ncock); i++){
                 if(strcmp(cock_data[i].password, m.password) != 0){
                     verify = false;
@@ -277,7 +284,7 @@ int main(int argc, char *argv[])
             char_data[n_chars].dir = UP;
             for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
-                        if(board[pos_y][pos_x + i].ch <= 46){
+                        if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
                             wmove(my_win, pos_x + i, pos_y);
                             waddch(my_win, '.'| A_BOLD);
                             board[pos_y][pos_x + i].ch = '.';
@@ -330,13 +337,21 @@ int main(int argc, char *argv[])
             case UP:
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
-                        if(board[pos_y][pos_x + i].ch <= 46){
+                        if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
                             under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
                                 m2.ch = ' ';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y][pos_x + i].ch = '#';
+                                m2.ch = '#';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
@@ -377,13 +392,21 @@ int main(int argc, char *argv[])
             case DOWN:
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
-                        if(board[pos_y][pos_x - i].ch <= 46){
+                        if(board[pos_y][pos_x - i].ch <= 46 && board[pos_y][pos_x - i].ch != 35){
                             under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
                                 m2.ch = ' ';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y][pos_x - i].ch = '#';
+                                m2.ch = '#';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
@@ -424,13 +447,21 @@ int main(int argc, char *argv[])
             case LEFT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
-                        if(board[pos_y + i][pos_x].ch <= 46){  
+                        if(board[pos_y + i][pos_x].ch <= 46 && board[pos_y + i][pos_x].ch != 35){  
                             under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
                                 m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y + i][pos_x].ch = '#';
+                                m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
@@ -471,13 +502,21 @@ int main(int argc, char *argv[])
             case RIGHT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
-                        if(board[pos_y - i][pos_x].ch <= 46){
+                        if(board[pos_y - i][pos_x].ch <= 46 && board[pos_y - i][pos_x].ch != 35){
                             under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
                                 m2.ch = ' ';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y - i][pos_x].ch = '#';
+                                m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
@@ -525,7 +564,7 @@ int main(int argc, char *argv[])
                 m2.posy = pos_y;
                 /* claculates new mark position */
                 new_position(&pos_x, &pos_y, direction);
-                //collision, don't change position
+                //collision with lizard, don't change position
                 if(board[pos_y][pos_x].ch > 46 && board[pos_y][pos_x].ch != ch){
                     //half of total score
                     i = find_ch_info(char_data, n_chars, board[pos_y][pos_x].ch);
@@ -535,6 +574,14 @@ int main(int argc, char *argv[])
 
                     if(char_data[i].score >= 50)
                         char_data[i].win = true;
+
+                    //don't change position
+                    pos_x = char_data[ch_pos].pos_x;
+                    pos_y = char_data[ch_pos].pos_y;
+
+                }else if(board[pos_y][pos_x].ch == 35){
+                    //reduce score by 10
+                    char_data[ch_pos].score = char_data[ch_pos].score - 10;
 
                     //don't change position
                     pos_x = char_data[ch_pos].pos_x;
@@ -706,7 +753,7 @@ int main(int argc, char *argv[])
             ncock = m.ncock;
             //check if there is no more space for cockroaches
             if(total_cock + ncock > MAX_COCK){
-                //"too many cockroaches" and close the client
+                //"too many insects" and close the client
                 m.ncock = 0;
                 zmq_send (responder, &m, sizeof(m), 0);
             }else{                
@@ -758,7 +805,7 @@ int main(int argc, char *argv[])
                 switch (direction)
                 {
                 case UP:
-                    if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch <= 46){
+                    if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch <= 46 && board[pos_y][pos_x - 1].ch != 35){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
@@ -797,7 +844,7 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case DOWN:
-                    if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch <= 46){
+                    if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch <= 46 && board[pos_y][pos_x + 1].ch != 35){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
@@ -836,7 +883,7 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case LEFT:
-                    if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch <= 46){
+                    if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch <= 46 && board[pos_y - 1][pos_x].ch != 35){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
@@ -875,7 +922,7 @@ int main(int argc, char *argv[])
                     }
                     break;
                 case RIGHT:
-                    if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch <= 46){
+                    if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch <= 46 && board[pos_y + 1][pos_x].ch != 35){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
                         if(under == 0){
                             wmove(my_win, pos_x, pos_y);
@@ -963,7 +1010,15 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x + i].ch = ' ';
                                 m2.ch = ' ';
                                 m2.posx = pos_x + i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x + i, pos_y);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y][pos_x + i].ch = '#';
+                                m2.ch = '#';
+                                m2.posx = pos_x + i;
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
@@ -971,7 +1026,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x + i].ch = '*';
                                 m2.ch = '*';
                                 m2.posx = pos_x + i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
@@ -979,7 +1034,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x + i].ch = '.';
                                 m2.ch = '.';
                                 m2.posx = pos_x + i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
@@ -987,7 +1042,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x + i].ch = under;
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x + i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }    
@@ -1010,7 +1065,15 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x - i].ch = ' ';
                                 m2.ch = ' ';
                                 m2.posx = pos_x - i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x - i, pos_y);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y][pos_x - i].ch = '#';
+                                m2.ch = '#';
+                                m2.posx = pos_x - i;
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
@@ -1018,7 +1081,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x - i].ch = '*';
                                 m2.ch = '*';
                                 m2.posx = pos_x - i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
@@ -1026,7 +1089,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x - i].ch = '.';
                                 m2.ch = '.';
                                 m2.posx = pos_x - i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
@@ -1034,7 +1097,7 @@ int main(int argc, char *argv[])
                                 board[pos_y][pos_x - i].ch = under;
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x - i;
-                                m2.posy = pos_y;		
+                                m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
@@ -1057,7 +1120,15 @@ int main(int argc, char *argv[])
                                 board[pos_y + i][pos_x].ch = ' ';
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y + i;		
+                                m2.posy = pos_y + i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x, pos_y + i);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y + i][pos_x].ch = '#';
+                                m2.ch = '#';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y + i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
@@ -1065,7 +1136,7 @@ int main(int argc, char *argv[])
                                 board[pos_y + i][pos_x].ch = '*';
                                 m2.ch = '*';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y + i;		
+                                m2.posy = pos_y + i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
@@ -1073,7 +1144,7 @@ int main(int argc, char *argv[])
                                 board[pos_y + i][pos_x].ch = '.';
                                 m2.ch = '.';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y + i;		
+                                m2.posy = pos_y + i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
@@ -1081,7 +1152,7 @@ int main(int argc, char *argv[])
                                 board[pos_y + i][pos_x].ch = under;
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
-                                m2.posy = pos_y + i;		
+                                m2.posy = pos_y + i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
@@ -1104,7 +1175,15 @@ int main(int argc, char *argv[])
                                 board[pos_y - i][pos_x].ch = ' ';
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y - i;		
+                                m2.posy = pos_y - i;	
+                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                            }else if(under == 7){
+                                wmove(my_win, pos_x, pos_y - i);
+                                waddch(my_win, '#'| A_BOLD);
+                                board[pos_y - i][pos_x].ch = '#';
+                                m2.ch = '#';
+                                m2.posx = pos_x;
+                                m2.posy = pos_y - i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
@@ -1112,7 +1191,7 @@ int main(int argc, char *argv[])
                                 board[pos_y - i][pos_x].ch = '*';
                                 m2.ch = '*';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y - i;		
+                                m2.posy = pos_y - i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
@@ -1120,7 +1199,7 @@ int main(int argc, char *argv[])
                                 board[pos_y - i][pos_x].ch = '.';
                                 m2.ch = '.';
                                 m2.posx = pos_x;
-                                m2.posy = pos_y - i;		
+                                m2.posy = pos_y - i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
@@ -1128,13 +1207,13 @@ int main(int argc, char *argv[])
                                 board[pos_y - i][pos_x].ch = under;
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
-                                m2.posy = pos_y - i;		
+                                m2.posy = pos_y - i;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);
                             }
                         }
-                        board[pos_y - i][pos_x].nlayers--;
+                        board[pos_y - i][pos_x].nlayers--;    
                         if(char_data[ch_pos].win == true)
-                            board[pos_y - i][pos_x].wlayers--;    
+                            board[pos_y - i][pos_x].wlayers--;
                     }else{
                         break;
                     }
@@ -1171,8 +1250,239 @@ int main(int argc, char *argv[])
             box(my_win, 0 , 0);
             wrefresh(my_win);
         }
-
-        
+        //wasp joins
+        else if(m.msg_type == 6){
+            //number of wasps from this user
+            ncock = m.ncock;
+            //check if there is no more space for wasps
+            if(total_cock + ncock > MAX_COCK){
+                //"too many insects" and close the client
+                m.ncock = 0;
+                zmq_send (responder, &m, sizeof(m), 0);
+            }else{                
+                //random position for each cockroach
+                i = 0;
+                while(i != ncock){
+                    k = random()%(WINDOW_SIZE-2) + 1;
+                    l = random()%(WINDOW_SIZE-2) + 1;
+                    //if it is a free spaceor a lizard body
+                    if((board[l][k].ch == 32) || (board[l][k].ch == 42) || (board[l][k].ch == 46)){
+                        //save the wasp data
+                        cock_data[total_cock + i].value = '#';
+                        cock_data[total_cock + i].posx = k;
+                        cock_data[total_cock + i].posy = l;
+                        board[l][k].ch = '#';
+                        strcpy(cock_data[total_cock + i].password, m.password);
+                        //print the wasp
+                        wmove(my_win, k, l);
+                        waddch(my_win, '#'| A_BOLD);
+                        //send to displays
+                        m2.ch = '#';
+                        m2.posx = k;
+                        m2.posy = l;		
+                        zmq_send (publisher, &m2, sizeof(m2), 0);
+                        i++;
+                    }
+                }
+                wrefresh(my_win);
+                //send the position of the first cockroach in the data array
+                m.ch = total_cock;
+                zmq_send (responder, &m, sizeof(m), 0);
+                //update the number of cockroaches in the server
+                total_cock = total_cock + ncock;
+            }
+        }
+        //wasp movement
+        else if(m.msg_type == 7 && verify == true){
+            ncock = m.ncock;
+            fcock = m.ch;
+            bool winner = false;
+            for(i = 0; i < ncock; i++){
+                //load previous data
+                pos_x = cock_data[fcock + i].posx;
+                pos_y = cock_data[fcock + i].posy;
+                ch = '#';
+                direction = m.cockdir[i];
+            if((time(&start_time)-cock_data[fcock + i].time_eaten)>=5){
+                switch (direction)
+                {
+                case UP:
+                    //TODO: decrease lizard score if there's a collision
+                    if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch <= 46 && board[pos_y][pos_x - 1].ch != 35 && board[pos_y][pos_x - 1].ch >= 32){
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        if(under == 0 || under == 7){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, ' ');
+                            board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 8){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 9){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else{
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, (under + '0')| A_BOLD);
+                            board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }
+                        pos_x--;
+                    }
+                    break;
+                case DOWN:
+                    if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch <= 46 && board[pos_y][pos_x + 1].ch != 35 && board[pos_y][pos_x + 1].ch >= 32){
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        if(under == 0 || under == 7){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, ' ');
+                            board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 8){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 9){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else{
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, (under + '0')| A_BOLD);
+                            board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }
+                        pos_x++;
+                    }
+                    break;
+                case LEFT:
+                    if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch <= 46 && board[pos_y - 1][pos_x].ch != 35 && board[pos_y - 1][pos_x].ch >= 32){
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        if(under == 0 || under == 7){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, ' ');
+                            board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 8){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 9){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else{
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, (under + '0')| A_BOLD);
+                            board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }
+                        pos_y--;
+                    }
+                    break;
+                case RIGHT:
+                    if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch <= 46 && board[pos_y + 1][pos_x].ch != 35 && board[pos_y + 1][pos_x].ch >= 32){
+                        under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        if(under == 0 || under == 7){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, ' ');
+                            board[pos_y][pos_x].ch = ' ';
+                            m2.ch = ' ';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 8){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '*'| A_BOLD);
+                            board[pos_y][pos_x].ch = '*';
+                            m2.ch = '*';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else if(under == 9){
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, '.'| A_BOLD);
+                            board[pos_y][pos_x].ch = '.';
+                            m2.ch = '.';
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }else{
+                            wmove(my_win, pos_x, pos_y);
+                            waddch(my_win, (under + '0')| A_BOLD);
+                            board[pos_y][pos_x].ch = under;
+                            m2.ch = (char)(under + '0');
+                            m2.posx = pos_x;
+                            m2.posy = pos_y;		
+                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                        }
+                        pos_y++;
+                    }
+                    break;
+                default:
+                    break;
+                }
+            
+                //saves data in new position
+                board[pos_y][pos_x].ch = ch;
+                cock_data[fcock +i].posx = pos_x;
+                cock_data[fcock +i].posy = pos_y;
+                //print new position
+                wmove(my_win, pos_x, pos_y);
+                waddch(my_win, ch | A_BOLD);
+                m2.ch = ch;
+                m2.posx = pos_x;
+                m2.posy = pos_y;		
+                zmq_send (publisher, &m2, sizeof(m2), 0);
+            }
+            }
+            wrefresh(my_win);
+            zmq_send (responder, &m, sizeof(m), 0);
+        }
     }
   	
     zmq_close(publisher);
