@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+enum proto_direction {
+    UP = 0;
+    DOWN = 1;
+    LEFT = 2;
+    RIGHT = 3;
+}
+
+message proto_char_message {
+    required int32 msg_type = 1;
+    required string ch = 2;
+    required int32 ncock = 3;
+    required proto_direction direction = 4;
+    repeated proto_direction cockdir = 5;
+    required string password = 6;
+}
+
+message proto_display_message {
+    required int32 posx = 1;
+    required int32 posy = 2;
+    required string ch = 3;
+    required int32 score = 4;
+}
