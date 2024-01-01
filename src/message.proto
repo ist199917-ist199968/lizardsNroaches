@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 enum proto_direction {
     UP = 0;
