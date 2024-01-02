@@ -1296,6 +1296,7 @@ int main(int argc, char *argv[])
         else if(m.msg_type == 7 && verify == true){
             ncock = m.ncock;
             fcock = m.ch;
+            int ch_pos;
             bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data
@@ -1303,12 +1304,14 @@ int main(int argc, char *argv[])
                 pos_y = cock_data[fcock + i].posy;
                 ch = '#';
                 direction = m.cockdir[i];
-            if((time(&start_time)-cock_data[fcock + i].time_eaten)>=5){
+
                 switch (direction)
                 {
                 case UP:
                     //TODO: decrease lizard score if there's a collision
-                    if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch <= 46 && board[pos_y][pos_x - 1].ch != 35 && board[pos_y][pos_x - 1].ch >= 32){
+                    if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch != 35 && board[pos_y][pos_x - 1].ch >= 32){
+                        //check if lizard head
+                        if(board[pos_y][pos_x - 1].ch <= 46){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
@@ -1344,10 +1347,17 @@ int main(int argc, char *argv[])
                             zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_x--;
+                        }
+                        //bumped lizard head
+                        else{
+                            ch_pos = find_ch_info(char_data, n_chars, board[pos_y][pos_x - 1].ch);
+                            char_data[ch_pos].score = char_data[ch_pos].score - 10;
+                        }
                     }
                     break;
                 case DOWN:
-                    if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch <= 46 && board[pos_y][pos_x + 1].ch != 35 && board[pos_y][pos_x + 1].ch >= 32){
+                    if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch != 35 && board[pos_y][pos_x + 1].ch >= 32){
+                        if(board[pos_y][pos_x + 1].ch <= 46){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
@@ -1383,10 +1393,15 @@ int main(int argc, char *argv[])
                             zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_x++;
+                        } else{
+                            ch_pos = find_ch_info(char_data, n_chars, board[pos_y][pos_x + 1].ch);
+                            char_data[ch_pos].score = char_data[ch_pos].score - 10;
+                        }
                     }
                     break;
                 case LEFT:
-                    if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch <= 46 && board[pos_y - 1][pos_x].ch != 35 && board[pos_y - 1][pos_x].ch >= 32){
+                    if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch != 35 && board[pos_y - 1][pos_x].ch >= 32){
+                        if(board[pos_y - 1][pos_x].ch <= 46){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
@@ -1422,10 +1437,15 @@ int main(int argc, char *argv[])
                             zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_y--;
+                        } else{
+                            ch_pos = find_ch_info(char_data, n_chars, board[pos_y - 1][pos_x].ch);
+                            char_data[ch_pos].score = char_data[ch_pos].score - 10;
+                        }
                     }
                     break;
                 case RIGHT:
-                    if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch <= 46 && board[pos_y + 1][pos_x].ch != 35 && board[pos_y + 1][pos_x].ch >= 32){
+                    if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch != 35 && board[pos_y + 1][pos_x].ch >= 32){
+                        if(board[pos_y + 1][pos_x].ch <= 46){
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
@@ -1461,6 +1481,10 @@ int main(int argc, char *argv[])
                             zmq_send (publisher, &m2, sizeof(m2), 0);
                         }
                         pos_y++;
+                        } else{
+                            ch_pos = find_ch_info(char_data, n_chars, board[pos_y + 1][pos_x].ch);
+                            char_data[ch_pos].score = char_data[ch_pos].score - 10;
+                        }
                     }
                     break;
                 default:
@@ -1471,14 +1495,26 @@ int main(int argc, char *argv[])
                 board[pos_y][pos_x].ch = ch;
                 cock_data[fcock +i].posx = pos_x;
                 cock_data[fcock +i].posy = pos_y;
+                scoreboard(char_data, n_chars);
+                //send scoreboard
+                m2.posx = 999; //flag for scoreboard
+                m2.posy = n_chars; //send number of characters
+                zmq_send (publisher, &m2, sizeof(m2), 0);
+                for(int j = 0; j < n_chars; j++){
+                    m2.posx = char_data[j].ch;
+                    //m2.ch = (char)(char_data[i].ch + '0');
+                    m2.score = char_data[j].score;
+                    zmq_send (publisher, &m2, sizeof(m2), 0);
+                }
+                refresh();
                 //print new position
+                box(my_win, 0 , 0);
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win, ch | A_BOLD);
                 m2.ch = ch;
                 m2.posx = pos_x;
                 m2.posy = pos_y;		
                 zmq_send (publisher, &m2, sizeof(m2), 0);
-            }
             }
             wrefresh(my_win);
             zmq_send (responder, &m, sizeof(m), 0);
