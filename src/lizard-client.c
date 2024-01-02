@@ -1,5 +1,6 @@
 #include <zmq.h>
 #include <ncurses.h>
+#include "message.pb-c.h"
 #include "remote-char.h"
 #include <unistd.h>
 #include <sys/types.h>
@@ -51,16 +52,22 @@ int main(int argc, char *argv[])
     }
     password[49]='\0';
     // send connection message
-    remote_char_t m;
+    //remote_char_t m;
+    ProtoCharMessage m;
     m.msg_type = 0;
-    m.ch = ch;
+    m.ch = &ch;
     m.direction = 0;
     strcpy(m.password, password);
-    zmq_send (requester, &m, sizeof(m), 0);
-    
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t* packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
     //receive the assigned letter from the server or flag that is full
-    zmq_recv (requester, &m, sizeof(m), 0);
-    ch = m.ch;
+    zmq_recv (requester, packed_buffer, packed_size, 0);
+    ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    strcpy(&ch,recvm->ch);
     if(ch == 0){
         printf("Tamos cheios :/\n");
         return 0;
@@ -69,12 +76,13 @@ int main(int argc, char *argv[])
 	cbreak();				/* Line buffering disabled	*/
 	keypad(stdscr, TRUE);		/* We get F1, F2 etc..		*/
 	noecho();			/* Don't echo() while we do getch */
-
+    proto_char_message__free_unpacked(recvm, NULL);
+    recvm=NULL;
     int n = 0;
     mvprintw(0,0,"Player %c", ch);
     // prepare the movement message
     m.msg_type = 1;
-    m.ch = ch;
+    m.ch = &ch;
     int key, score = 0;
     while(1){
     	key = getch();	
@@ -85,29 +93,37 @@ int main(int argc, char *argv[])
         case KEY_LEFT:
             mvprintw(3,0,"%d Left arrow is pressed", n);
             // prepare the movement message
-           m.direction = LEFT;
+           m.direction = PROTO_DIRECTION__LEFT;
             break;
         case KEY_RIGHT:
             mvprintw(3,0,"%d Right arrow is pressed", n);
             // prepare the movement message
-            m.direction = RIGHT;
+            m.direction = PROTO_DIRECTION__RIGHT;
             break;
         case KEY_DOWN:
             mvprintw(3,0,"%d Down arrow is pressed", n);
             // prepare the movement message
-           m.direction = DOWN;
+           m.direction = PROTO_DIRECTION__DOWN;
             break;
         case KEY_UP:
             mvprintw(3,0,"%d :Up arrow is pressed", n);
             // prepare the movement message
-            m.direction = UP;
+            m.direction = PROTO_DIRECTION__DOWN;
             break;
         
         case 'q':
         case 'Q':
             m.msg_type = 5;
-            zmq_send (requester, &m, sizeof(m), 0);
-            zmq_recv (requester, &m, sizeof(m), 0);
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (requester, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            zmq_recv (requester, packed_buffer, packed_size, 0);
+            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
             free(candidate1);
             endwin();
             return 0;
@@ -120,10 +136,17 @@ int main(int argc, char *argv[])
 
         //send the movement message
         if (key != 'x'){
-            zmq_send (requester, &m, sizeof(m), 0);
-            //receive score and display it
-            zmq_recv (requester, &m, sizeof(m), 0);
-            score = m.ncock;
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (requester, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            zmq_recv (requester, packed_buffer, packed_size, 0);
+            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+            score = recvm->ncock;
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
             mvprintw(1,0,"Score - %d", score);
         }
         refresh();			/* Print it on to the real screen */

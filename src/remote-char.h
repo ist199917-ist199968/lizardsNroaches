@@ -1,4 +1,6 @@
 #include <time.h>
+#include "message.pb-c.h"
+
 typedef enum direction_t {UP, DOWN, LEFT, RIGHT} direction_t;
 
 typedef struct remote_char_t
