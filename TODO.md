@@ -3,7 +3,7 @@
 ## GENERAL
 [] Disconnect users (roaches, lizards, wasps) +
 [] + timeout, 1 minuto de inatividade. Caso o user queira voltar mandar notificação que as mensagens são inválidas
-[] limite de wasps + cocks
+[] limite de wasps + cocks DONE
 [] 4 threads para lizards e 1 para cocks and wasps
 [] mudar o display para lizard client
 [] lizard perde quando score negativo e passa-se a desenhar apenas a cabeça
@@ -15,7 +15,7 @@ server should be supported by Protocol Buffers for message encoding."
 [] Wasps ou Roaches com diferente linguagem (opcional)
 
 
-## Wasps:
+## Wasps: DONE
 [] random spawn
 [] não pode existir numa casa com outras wasps, roaches ou cabeças de lizard
 [] quando uma wasp se move contra a cabeça dum lizard ou vice versa, diminuir o score do lizard e ambos não se movem!
