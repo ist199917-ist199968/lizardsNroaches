@@ -54,16 +54,21 @@ int main(int argc, char *argv[])
     // send connection message
     //remote_char_t m;
     ProtoCharMessage m;
+    proto_char_message__init(&m); 
     m.msg_type = 0;
+    m.ch=malloc(sizeof(char));
+    m.password=malloc(50*sizeof(char));
     m.ch = &ch;
     m.direction = 0;
     strcpy(m.password, password);
+    
     size_t packed_size = proto_char_message__get_packed_size(&m);
     uint8_t* packed_buffer = malloc(packed_size);
     proto_char_message__pack(&m, packed_buffer);
     zmq_send (requester, packed_buffer, packed_size, 0);
     free(packed_buffer);
     packed_buffer=NULL;
+    
     //receive the assigned letter from the server or flag that is full
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
@@ -111,7 +116,7 @@ int main(int argc, char *argv[])
         case KEY_UP:
             mvprintw(3,0,"%d :Up arrow is pressed", n);
             // prepare the movement message
-            m.direction = PROTO_DIRECTION__DOWN;
+            m.direction = PROTO_DIRECTION__UP;
             break;
         
         case 'q':

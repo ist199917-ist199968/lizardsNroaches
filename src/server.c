@@ -175,7 +175,13 @@ int main(int argc, char *argv[])
     
     int n_chars = 0;
     ProtoCharMessage m;
+    proto_char_message__init(&m);
+    m.ch=malloc(sizeof(char));
+    m.password=malloc(sizeof(char)*50);
+    m.cockdir=malloc(sizeof(ProtoDirection)*10);
     ProtoDisplayMessage m2;
+    proto_display_message__init(&m2);
+    m2.ch=malloc(sizeof(char));
     cockroach_info_t cock_data[MAX_COCK];
     
     for (int c=0; c<MAX_PLAYERS; c++)
@@ -267,7 +273,7 @@ int main(int argc, char *argv[])
         if(recvm->msg_type == 0){
             //max players
             if(n_chars == MAX_PLAYERS){
-                recvm->ch = 0;
+                *(recvm->ch) = 0;
                 packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
                 proto_char_message__pack(recvm, packed_buffer);
@@ -350,10 +356,10 @@ int main(int argc, char *argv[])
             }
         }
         //lizard movement message
-        else if(m.msg_type == 1 && verify == true){
+        else if(recvm->msg_type == 1 && verify == true){
             //check if current ch_pos is a winner
             bool winner = false;
-            int ch_pos = find_ch_info(char_data, n_chars, *(m.ch));
+            int ch_pos = find_ch_info(char_data, n_chars, *(recvm->ch));
             if(ch_pos != -1){
 
                 pos_x = char_data[ch_pos].pos_x;
@@ -702,7 +708,7 @@ int main(int argc, char *argv[])
                 break;
             }
                 /* claculates new direction */
-                direction = m.direction;
+                direction = recvm->direction;
                 char_data[ch_pos].dir = direction;
                 m2.posx = pos_x;
                 m2.posy = pos_y;
@@ -749,10 +755,10 @@ int main(int argc, char *argv[])
                     char_data[ch_pos].win = true;
 
                 //send score back to lizard
-                m.ncock = char_data[ch_pos].score;
-                packed_size = proto_char_message__get_packed_size(&m);
+                recvm->ncock = char_data[ch_pos].score;
+                packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
-                proto_char_message__pack(&m, packed_buffer);
+                proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
@@ -922,22 +928,22 @@ int main(int argc, char *argv[])
     
         }
         //remote display joins
-        else if(m.msg_type == 2){
+        else if(recvm->msg_type == 2){
             //send the board with the printed chars
             zmq_send (responder, &board, sizeof(board), 0); //Probably a new board needs to be created in protobuf.
 
         }
         //cockroach joins
-        else if(m.msg_type == 3){
+        else if(recvm->msg_type == 3){
             //number of cockroaches from this user
-            ncock = m.ncock;
+            ncock = recvm->ncock;
             //check if there is no more space for cockroaches
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
-                m.ncock = 0;
-                packed_size = proto_char_message__get_packed_size(&m);
+                recvm->ncock = 0;
+                packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
-                proto_char_message__pack(&m, packed_buffer);
+                proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;            }else{                
@@ -973,10 +979,10 @@ int main(int argc, char *argv[])
                 }
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
-                *(m.ch) = total_cock;
-                packed_size = proto_char_message__get_packed_size(&m);
+                *(recvm->ch) = total_cock;
+                packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
-                proto_char_message__pack(&m, packed_buffer);
+                proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (publisher, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;                //update the number of cockroaches in the server
@@ -984,16 +990,16 @@ int main(int argc, char *argv[])
             }
         }
         //cockroach movement
-        else if(m.msg_type == 4 && verify == true){
+        else if(recvm->msg_type == 4 && verify == true){
             ncock = m.ncock;
-            fcock = *(m.ch);
+            fcock = *(recvm->ch);
             bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
                 ch = cock_data[fcock + i].value;
-                direction = m.cockdir[i];
+                direction = recvm->cockdir[i];
             if((time(&start_time)-cock_data[fcock + i].time_eaten)>=5){
                 switch (direction)
                 {
@@ -1278,15 +1284,15 @@ int main(int argc, char *argv[])
             packed_buffer=NULL;
         } 
         //lizard disconnect
-        else if(m.msg_type == 5 && verify == true){
-            packed_size = proto_char_message__get_packed_size(&m);
+        else if(recvm->msg_type == 5 && verify == true){
+            packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
-            proto_char_message__pack(&m, packed_buffer);
+            proto_char_message__pack(recvm, packed_buffer);
             zmq_send (responder, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
             
-            int ch_pos = find_ch_info(char_data, n_chars, *(m.ch));
+            int ch_pos = find_ch_info(char_data, n_chars, *(recvm->ch));
             bool winner = char_data[ch_pos].win;
             pos_x = char_data[ch_pos].pos_x;
             pos_y = char_data[ch_pos].pos_y;
@@ -1687,16 +1693,16 @@ int main(int argc, char *argv[])
             wrefresh(my_win);
         }
         //wasp joins
-        else if(m.msg_type == 6){
+        else if(recvm->msg_type == 6){
             //number of wasps from this user
-            ncock = m.ncock;
+            ncock = recvm->ncock;
             //check if there is no more space for wasps
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
-                m.ncock = 0;
-                packed_size = proto_char_message__get_packed_size(&m);
+                recvm->ncock = 0;
+                packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
-                proto_char_message__pack(&m, packed_buffer);
+                proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
@@ -1732,10 +1738,10 @@ int main(int argc, char *argv[])
                 }
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
-                *(m.ch) = total_cock;
-                packed_size = proto_char_message__get_packed_size(&m);
+                *(recvm->ch) = total_cock;
+                packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
-                proto_char_message__pack(&m, packed_buffer);
+                proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
@@ -1744,9 +1750,9 @@ int main(int argc, char *argv[])
             }
         }
         //wasp movement
-        else if(m.msg_type == 7 && verify == true){
-            ncock = m.ncock;
-            fcock = *(m.ch);
+        else if(recvm->msg_type == 7 && verify == true){
+            ncock = recvm->ncock;
+            fcock = *(recvm->ch);
             int ch_pos;
             bool winner = false;
             for(i = 0; i < ncock; i++){
@@ -1754,7 +1760,7 @@ int main(int argc, char *argv[])
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
                 ch = '#';
-                direction = m.cockdir[i];
+                direction = recvm->cockdir[i];
 
                 switch (direction)
                 {
