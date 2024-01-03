@@ -15,6 +15,11 @@
 #define WINDOW_SIZE 30 
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
 #define MAX_PLAYERS 26
+#define UP PROTO_DIRECTION__UP
+#define DOWN PROTO_DIRECTION__DOWN
+#define LEFT PROTO_DIRECTION__LEFT
+#define RIGHT PROTO_DIRECTION__RIGHT
+
 
 time_t start_time;
 
@@ -24,7 +29,7 @@ typedef struct ch_info_t
     int pos_x, pos_y;
     int score;
     bool win;
-    direction_t dir;
+    ProtoDirection dir;
     char password[50];
 } ch_info_t;
 
@@ -84,7 +89,7 @@ int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX
     return under;
 }
 
-void new_position(int* x, int *y, direction_t direction){
+void new_position(int* x, int *y, ProtoDirection direction){
         switch (direction)
         {
         case UP:
@@ -230,7 +235,7 @@ int main(int argc, char *argv[])
     int pos_y;
     int i, k, l, under;
     int ncock, total_cock = 0, fcock;
-    direction_t  direction;
+    ProtoDirection  direction;
     bool verify = false;
     size_t packed_size;
     uint8_t* packed_buffer;
@@ -307,8 +312,8 @@ int main(int argc, char *argv[])
             board[pos_y][pos_x].ch = ch;
 
             //initiate lizard going up
-            direction = UP;
-            char_data[n_chars].dir = UP;
+            direction = PROTO_DIRECTION__UP;
+            char_data[n_chars].dir = PROTO_DIRECTION__UP;
             for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
@@ -318,7 +323,7 @@ int main(int argc, char *argv[])
                             *(m2.ch) = '.';
                             m2.posx = pos_x + i;
                             m2.posy = pos_y;
-                            packed_size = proto_char_message__get_packed_size(m2);
+                            packed_size = proto_display_message__get_packed_size(&m2);
                             packed_buffer = malloc(packed_size);
                             proto_display_message__pack(&m2, packed_buffer);
                             zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -340,7 +345,7 @@ int main(int argc, char *argv[])
             *(m2.ch) = ch;
             m2.posx = pos_x;
             m2.posy = pos_y;	
-            packed_size = proto_char_message__get_packed_size(m2);
+            packed_size = proto_display_message__get_packed_size(&m2);
             packed_buffer = malloc(packed_size);
             proto_display_message__pack(&m2, packed_buffer);
             zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -369,7 +374,7 @@ int main(int argc, char *argv[])
                 *(m2.ch) = ' ';
                 m2.posx = pos_x;
                 m2.posy = pos_y;	
-                packed_size = proto_char_message__get_packed_size(m2);
+                packed_size = proto_display_message__get_packed_size(&m2);
                 packed_buffer = malloc(packed_size);
                 proto_display_message__pack(&m2, packed_buffer);
                 zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -390,7 +395,7 @@ int main(int argc, char *argv[])
                                 *(m2.ch) = ' ';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
                                 zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -403,7 +408,7 @@ int main(int argc, char *argv[])
                                 *(m2.ch) = '#';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
                                 zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -416,7 +421,7 @@ int main(int argc, char *argv[])
                                 *(m2.ch) = '*';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
                                 zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -429,7 +434,7 @@ int main(int argc, char *argv[])
                                 *(m2.ch) = '.';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
                                 zmq_send (publisher, packed_buffer, packed_size, 0);
@@ -442,7 +447,12 @@ int main(int argc, char *argv[])
                                 *(m2.ch) = (char)(under + '0');
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
@@ -465,7 +475,12 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
@@ -473,7 +488,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
@@ -481,7 +501,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -489,7 +514,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -497,7 +527,12 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
@@ -520,7 +555,12 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '#'| A_BOLD);
@@ -528,7 +568,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '*'| A_BOLD);
@@ -536,7 +581,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -544,7 +594,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -552,7 +607,12 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
@@ -575,7 +635,12 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '#'| A_BOLD);
@@ -583,7 +648,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '*'| A_BOLD);
@@ -591,7 +661,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -599,7 +674,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -607,7 +687,12 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
@@ -670,7 +755,12 @@ int main(int argc, char *argv[])
 
                 //send score back to lizard
                 m.ncock = char_data[ch_pos].score;
-                zmq_send (responder, &m, sizeof(m), 0);
+                packed_size = proto_char_message__get_packed_size(&m);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(&m, packed_buffer);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
             }
             //draw lizard tail
             switch (direction)
@@ -683,11 +773,11 @@ int main(int argc, char *argv[])
                             if(char_data[ch_pos].win == true){
                                 board[pos_y][pos_x + i].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
-                                m2.ch = '*';
+                                *(m2.ch) = '*';
                             }else{
                                 board[pos_y][pos_x + i].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
-                                m2.ch = '.';
+                                *(m2.ch) = '.';
                             }
                             m2.posx = pos_x + i;
                             m2.posy = pos_y;	
@@ -709,15 +799,20 @@ int main(int argc, char *argv[])
                             if(char_data[ch_pos].win == true){
                                 board[pos_y][pos_x - i].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
-                                m2.ch = '*';
+                                *(m2.ch) = '*';
                             }else{
                                 board[pos_y][pos_x - i].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
-                                m2.ch = '.';
+                                *(m2.ch) = '.';
                             }
                             m2.posx = pos_x - i;
                             m2.posy = pos_y;	
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }
                         board[pos_y][pos_x - i].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -735,15 +830,20 @@ int main(int argc, char *argv[])
                             if(char_data[ch_pos].win == true){
                                 board[pos_y + i][pos_x].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
-                                m2.ch = '*';
+                                *(m2.ch) = '*';
                             }else{
                                 board[pos_y + i][pos_x].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
-                                m2.ch = '.';
+                                *(m2.ch) = '.';
                             }
                             m2.posx = pos_x;
                             m2.posy = pos_y + i;	
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }
                         board[pos_y + i][pos_x].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -761,15 +861,20 @@ int main(int argc, char *argv[])
                             if(char_data[ch_pos].win == true){
                                 board[pos_y - i][pos_x].ch = '*';
                                 waddch(my_win, '*'| A_BOLD);
-                                m2.ch = '*';
+                               *( m2.ch) = '*';
                             }else{
                                 board[pos_y - i][pos_x].ch = '.';
                                 waddch(my_win, '.'| A_BOLD);
-                                m2.ch = '.';
+                                *(m2.ch) = '.';
                             }
                             m2.posx = pos_x;
                             m2.posy = pos_y - i;	
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }
                         board[pos_y - i][pos_x].nlayers++;    
                         if(char_data[ch_pos].win == true)
@@ -788,27 +893,43 @@ int main(int argc, char *argv[])
             //send scoreboard
             m2.posx = 999; //flag for scoreboard
             m2.posy = n_chars; //send number of characters
-            zmq_send (publisher, &m2, sizeof(m2), 0);
+            packed_size = proto_display_message__get_packed_size(&m2);
+            packed_buffer = malloc(packed_size);
+            proto_display_message__pack(&m2, packed_buffer);
+            zmq_send (publisher, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
             for(i = 0; i < n_chars; i++){
                 m2.posx = char_data[i].ch;
                 //m2.ch = (char)(char_data[i].ch + '0');
                 m2.score = char_data[i].score;
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_display_message__get_packed_size(&m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
             }
             refresh();
             box(my_win, 0 , 0);
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
             wrefresh(my_win);	
-            m2.ch = ch;		
+            *(m2.ch) = ch;		
             m2.posx = pos_x;
             m2.posy = pos_y;
-            zmq_send (publisher, &m2, sizeof(m2), 0);        
+            packed_size = proto_display_message__get_packed_size(&m2);
+            packed_buffer = malloc(packed_size);
+            proto_display_message__pack(&m2, packed_buffer);
+            zmq_send (publisher, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+    
         }
         //remote display joins
         else if(m.msg_type == 2){
             //send the board with the printed chars
-            zmq_send (responder, &board, sizeof(board), 0);
+            zmq_send (responder, &board, sizeof(board), 0); //Probably a new board needs to be created in protobuf.
 
         }
         //cockroach joins
@@ -819,8 +940,12 @@ int main(int argc, char *argv[])
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
                 m.ncock = 0;
-                zmq_send (responder, &m, sizeof(m), 0);
-            }else{                
+                packed_size = proto_char_message__get_packed_size(&m);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(&m, packed_buffer);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;            }else{                
                 //random position for each cockroach
                 i = 0;
                 while(i != ncock){
@@ -842,22 +967,31 @@ int main(int argc, char *argv[])
                         m2.ch = (char)(ch + '0');
                         m2.posx = k;
                         m2.posy = l;		
-                        zmq_send (publisher, &m2, sizeof(m2), 0);
+                        packed_size = proto_display_message__get_packed_size(&m2);
+                        packed_buffer = malloc(packed_size);
+                        proto_display_message__pack(&m2, packed_buffer);
+                        zmq_send (publisher, packed_buffer, packed_size, 0);
+                        free(packed_buffer);
+                        packed_buffer=NULL;
                         i++;
                     }
                 }
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
-                m.ch = total_cock;
-                zmq_send (responder, &m, sizeof(m), 0);
-                //update the number of cockroaches in the server
+                *(m.ch) = total_cock;
+                packed_size = proto_char_message__get_packed_size(&m);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(&m, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;                //update the number of cockroaches in the server
                 total_cock = total_cock + ncock;
             }
         }
         //cockroach movement
         else if(m.msg_type == 4 && verify == true){
             ncock = m.ncock;
-            fcock = m.ch;
+            fcock = *(m.ch);
             bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data
@@ -878,7 +1012,12 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -886,7 +1025,12 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -894,7 +1038,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -902,7 +1052,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_x--;
                     }
@@ -917,7 +1073,13 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -925,7 +1087,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -933,7 +1101,12 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -941,7 +1114,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_x++;
                     }
@@ -956,7 +1135,13 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -964,7 +1149,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -972,7 +1163,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -980,7 +1177,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_y--;
                     }
@@ -995,7 +1198,13 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -1003,7 +1212,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -1011,7 +1226,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -1019,7 +1240,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_y++;
                     }
@@ -1038,15 +1265,32 @@ int main(int argc, char *argv[])
                 m2.ch = (char)(ch + '0');
                 m2.posx = pos_x;
                 m2.posy = pos_y;		
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_display_message__get_packed_size(&m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
+
             }
             }
             wrefresh(my_win);
-            zmq_send (responder, &m, sizeof(m), 0);
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
         } 
         //lizard disconnect
         else if(m.msg_type == 5 && verify == true){
-            zmq_send (responder, &m, sizeof(m), 0);
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            
             int ch_pos = find_ch_info(char_data, n_chars, m.ch);
             bool winner = char_data[ch_pos].win;
             pos_x = char_data[ch_pos].pos_x;
@@ -1059,7 +1303,12 @@ int main(int argc, char *argv[])
             m2.ch = ' ';
             m2.posx = pos_x;
             m2.posy = pos_y;		
-            zmq_send (publisher, &m2, sizeof(m2), 0);
+            packed_size = proto_display_message__get_packed_size(&m2);
+            packed_buffer = malloc(packed_size);
+            proto_display_message__pack(&m2, packed_buffer);
+            zmq_send (publisher, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
             //delete from board
             switch (direction)
             {
@@ -1075,7 +1324,12 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
@@ -1083,7 +1337,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
@@ -1091,7 +1351,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -1099,7 +1365,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -1107,7 +1379,13 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
@@ -1130,7 +1408,13 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 7){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
@@ -1138,7 +1422,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
@@ -1146,7 +1436,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
@@ -1154,7 +1450,12 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -1162,7 +1463,12 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
@@ -1185,7 +1491,13 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '#'| A_BOLD);
@@ -1193,7 +1505,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '*'| A_BOLD);
@@ -1201,7 +1519,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -1209,7 +1533,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -1217,7 +1547,13 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
@@ -1240,7 +1576,13 @@ int main(int argc, char *argv[])
                                 m2.ch = ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '#'| A_BOLD);
@@ -1248,7 +1590,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '*'| A_BOLD);
@@ -1256,7 +1604,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
@@ -1264,7 +1618,13 @@ int main(int argc, char *argv[])
                                 m2.ch = '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, (under + '0')| A_BOLD);
@@ -1272,7 +1632,13 @@ int main(int argc, char *argv[])
                                 m2.ch = (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_display_message__get_packed_size(&m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
+
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
@@ -1303,12 +1669,23 @@ int main(int argc, char *argv[])
             //send scoreboard
             m2.posx = 999; //flag for scoreboard
             m2.posy = n_chars; //send number of characters
-            zmq_send (publisher, &m2, sizeof(m2), 0);
+            packed_size = proto_display_message__get_packed_size(&m2);
+            packed_buffer = malloc(packed_size);
+            proto_display_message__pack(&m2, packed_buffer);
+            zmq_send (publisher, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+
             for(i = 0; i < n_chars; i++){
                 m2.posx = char_data[i].ch;
                 //m2.ch = (char)(char_data[i].ch + '0');
                 m2.score = char_data[i].score;
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_display_message__get_packed_size(&m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
             }
             refresh();
             box(my_win, 0 , 0);
@@ -1322,7 +1699,12 @@ int main(int argc, char *argv[])
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
                 m.ncock = 0;
-                zmq_send (responder, &m, sizeof(m), 0);
+                packed_size = proto_char_message__get_packed_size(&m);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(&m, packed_buffer);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
             }else{                
                 //random position for each cockroach
                 i = 0;
@@ -1344,14 +1726,24 @@ int main(int argc, char *argv[])
                         m2.ch = '#';
                         m2.posx = k;
                         m2.posy = l;		
-                        zmq_send (publisher, &m2, sizeof(m2), 0);
+                        packed_size = proto_display_message__get_packed_size(&m2);
+                        packed_buffer = malloc(packed_size);
+                        proto_display_message__pack(&m2, packed_buffer);
+                        zmq_send (responder, packed_buffer, packed_size, 0);
+                        free(packed_buffer);
+                        packed_buffer=NULL;
                         i++;
                     }
                 }
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
                 m.ch = total_cock;
-                zmq_send (responder, &m, sizeof(m), 0);
+                packed_size = proto_char_message__get_packed_size(&m);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(&m, packed_buffer);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
                 //update the number of cockroaches in the server
                 total_cock = total_cock + ncock;
             }
@@ -1384,7 +1776,12 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -1392,7 +1789,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -1400,7 +1803,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -1408,7 +1817,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_x--;
                         }
@@ -1430,7 +1845,13 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -1438,7 +1859,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -1446,7 +1873,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -1454,7 +1887,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_x++;
                         } else{
@@ -1474,7 +1913,13 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -1482,7 +1927,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -1490,7 +1941,12 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -1498,7 +1954,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_y--;
                         } else{
@@ -1518,7 +1980,12 @@ int main(int argc, char *argv[])
                             m2.ch = ' ';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }else if(under == 8){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '*'| A_BOLD);
@@ -1526,7 +1993,13 @@ int main(int argc, char *argv[])
                             m2.ch = '*';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else if(under == 9){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, '.'| A_BOLD);
@@ -1534,7 +2007,13 @@ int main(int argc, char *argv[])
                             m2.ch = '.';
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }else{
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, (under + '0')| A_BOLD);
@@ -1542,7 +2021,13 @@ int main(int argc, char *argv[])
                             m2.ch = (char)(under + '0');
                             m2.posx = pos_x;
                             m2.posy = pos_y;		
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
+
                         }
                         pos_y++;
                         } else{
@@ -1563,12 +2048,23 @@ int main(int argc, char *argv[])
                 //send scoreboard
                 m2.posx = 999; //flag for scoreboard
                 m2.posy = n_chars; //send number of characters
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_display_message__get_packed_size(&m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
+
                 for(int j = 0; j < n_chars; j++){
                     m2.posx = char_data[j].ch;
                     //m2.ch = (char)(char_data[i].ch + '0');
                     m2.score = char_data[j].score;
-                    zmq_send (publisher, &m2, sizeof(m2), 0);
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
                 }
                 refresh();
                 //print new position
@@ -1578,10 +2074,21 @@ int main(int argc, char *argv[])
                 m2.ch = ch;
                 m2.posx = pos_x;
                 m2.posy = pos_y;		
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_display_message__get_packed_size(&m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
+
             }
             wrefresh(my_win);
-            zmq_send (responder, &m, sizeof(m), 0);
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
         }
     }
   	

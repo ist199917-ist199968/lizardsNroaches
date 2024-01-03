@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+message proto_board {
+    repeated proto_board_t board_prepacked = 1;
+}
+
+message proto_board_t {
+    required int32 ch = 1;
+    required int32 nlayers = 2;
+    required int32 wlayers = 3;
+}
