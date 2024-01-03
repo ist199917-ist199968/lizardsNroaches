@@ -1,6 +1,7 @@
 #include <zmq.h>
 #include <ncurses.h>
 #include <stdbool.h>
+#include "message.pb-c.h"
 #include "remote-char.h"
 #include <unistd.h>
 #include <sys/types.h>
@@ -173,8 +174,8 @@ int main(int argc, char *argv[])
         memset(char_data[c].password,'\0', sizeof(char_data[c].password));
     
     int n_chars = 0;
-    remote_char_t m;
-    remote_display_t m2;
+    ProtoCharMessage m;
+    ProtoDisplayMessage m2;
     cockroach_info_t cock_data[MAX_COCK];
     
     for (int c=0; c<MAX_PLAYERS; c++)
@@ -231,39 +232,65 @@ int main(int argc, char *argv[])
     int ncock, total_cock = 0, fcock;
     direction_t  direction;
     bool verify = false;
+    size_t packed_size;
+    uint8_t* packed_buffer;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
     while (1)
     {
-        zmq_recv (responder, &m, sizeof(m), 0);
-        if(m.msg_type == 1 || m.msg_type == 5){
-            i = find_ch_info(char_data, n_chars, m.ch);
-            if(strcmp(char_data[i].password, m.password) != 0){
+        packed_size=zmq_recvmsg(responder, &zmq_msg,0);
+        ProtoCharMessage *recvm = NULL;
+        packed_buffer = zmq_msg_data(&zmq_msg);
+        recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+        if(recvm->msg_type == 1 || recvm->msg_type == 5){
+            i = find_ch_info(char_data, n_chars, *(recvm->ch));
+            if(strcmp(char_data[i].password, recvm->password) != 0){
                 verify = false;
                 printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, m.password);
-                zmq_send (responder, &m, sizeof(m), 0);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
+
             } else{verify = true;}
-        }else if(m.msg_type == 4 || m.msg_type == 7){
-            for(i = m.ch; i < (m.ch + m.ncock); i++){
-                if(strcmp(cock_data[i].password, m.password) != 0){
+        }else if(recvm->msg_type == 4 || recvm->msg_type == 7){
+            for(i = *(recvm->ch); i < *(recvm->ch) + (recvm->ncock); i++){
+                if(strcmp(cock_data[i].password, recvm->password) != 0){
                     verify = false;
-                    zmq_send (responder, &m, sizeof(m), 0);
+                    zmq_send (responder, packed_buffer, packed_size, 0);
+                    proto_char_message__free_unpacked(recvm, NULL);
+                    recvm=NULL;
                     break;
                 }else{verify = true;}
             }
         }
         //new lizard character joins
-        if(m.msg_type == 0){
+        if(recvm->msg_type == 0){
             //max players
             if(n_chars == MAX_PLAYERS){
-                m.ch = 0;
-                zmq_send (responder, &m, sizeof(m), 0);
+                recvm->ch = 0;
+                packed_size = proto_char_message__get_packed_size(recvm);
+                packed_buffer = malloc(packed_size);
+                proto_char_message__pack(recvm, packed_buffer);
+                zmq_send (responder, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
             }else{
             //check if character is already in char_data
-            ch = m.ch;          
+            ch = *(recvm->ch);          
             ch = available_char(n_chars, ch, char_data);
-            m.ch = ch;
-            strcpy(char_data[n_chars].password, m.password);
-            zmq_send (responder, &m, sizeof(m), 0);
-            
+            *(recvm->ch) = ch;
+            strcpy(char_data[n_chars].password, recvm->password);
+            packed_size = proto_char_message__get_packed_size(recvm);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(recvm, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
+
             //find a free space (it can have a cockroach or a lizard body)
             while(1){
                 pos_x = random()%(WINDOW_SIZE-2) + 1;
@@ -288,10 +315,15 @@ int main(int argc, char *argv[])
                             wmove(my_win, pos_x + i, pos_y);
                             waddch(my_win, '.'| A_BOLD);
                             board[pos_y][pos_x + i].ch = '.';
-                            m2.ch = '.';
+                            *(m2.ch) = '.';
                             m2.posx = pos_x + i;
-                            m2.posy = pos_y;	
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            m2.posy = pos_y;
+                            packed_size = proto_char_message__get_packed_size(m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }
                         board[pos_y][pos_x + i].nlayers++;
                     }else{
@@ -305,17 +337,23 @@ int main(int argc, char *argv[])
             waddch(my_win, ch| A_BOLD);
             scoreboard(char_data, n_chars);
             wrefresh(my_win);	
-            m2.ch = ch;
+            *(m2.ch) = ch;
             m2.posx = pos_x;
             m2.posy = pos_y;	
-            zmq_send (publisher, &m2, sizeof(m2), 0);
+            packed_size = proto_char_message__get_packed_size(m2);
+            packed_buffer = malloc(packed_size);
+            proto_display_message__pack(&m2, packed_buffer);
+            zmq_send (publisher, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+
             }
         }
         //lizard movement message
         else if(m.msg_type == 1 && verify == true){
             //check if current ch_pos is a winner
             bool winner = false;
-            int ch_pos = find_ch_info(char_data, n_chars, m.ch);
+            int ch_pos = find_ch_info(char_data, n_chars, *(m.ch));
             if(ch_pos != -1){
 
                 pos_x = char_data[ch_pos].pos_x;
@@ -328,10 +366,16 @@ int main(int argc, char *argv[])
                 board[pos_y][pos_x].ch = ' ';
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win,' ');
-                m2.ch = ' ';
+                *(m2.ch) = ' ';
                 m2.posx = pos_x;
                 m2.posy = pos_y;	
-                zmq_send (publisher, &m2, sizeof(m2), 0);
+                packed_size = proto_char_message__get_packed_size(m2);
+                packed_buffer = malloc(packed_size);
+                proto_display_message__pack(&m2, packed_buffer);
+                zmq_send (publisher, packed_buffer, packed_size, 0);
+                free(packed_buffer);
+                packed_buffer=NULL;
+
             switch (direction)
             {
             case UP:
@@ -343,39 +387,59 @@ int main(int argc, char *argv[])
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
-                                m2.ch = ' ';
+                                *(m2.ch) = ' ';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '#';
-                                m2.ch = '#';
+                                *(m2.ch) = '#';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '*';
-                                m2.ch = '*';
+                                *(m2.ch) = '*';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '.';
-                                m2.ch = '.';
+                                *(m2.ch) = '.';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
-                                zmq_send (publisher, &m2, sizeof(m2), 0);
+                                packed_size = proto_char_message__get_packed_size(m2);
+                                packed_buffer = malloc(packed_size);
+                                proto_display_message__pack(&m2, packed_buffer);
+                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                free(packed_buffer);
+                                packed_buffer=NULL; //STOPPED CONVERTING HERE. TOMORROW WILL FINISH
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x + i].ch = under;
-                                m2.ch = (char)(under + '0');
+                                *(m2.ch) = (char)(under + '0');
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 zmq_send (publisher, &m2, sizeof(m2), 0);

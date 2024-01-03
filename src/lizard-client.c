@@ -65,7 +65,10 @@ int main(int argc, char *argv[])
     free(packed_buffer);
     packed_buffer=NULL;
     //receive the assigned letter from the server or flag that is full
-    zmq_recv (requester, packed_buffer, packed_size, 0);
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
     ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
     strcpy(&ch,recvm->ch);
     if(ch == 0){
@@ -120,7 +123,8 @@ int main(int argc, char *argv[])
             zmq_send (requester, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
-            zmq_recv (requester, packed_buffer, packed_size, 0);
+            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+            packed_buffer = zmq_msg_data(&zmq_msg);
             recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
             proto_char_message__free_unpacked(recvm, NULL);
             recvm=NULL;
@@ -142,7 +146,8 @@ int main(int argc, char *argv[])
             zmq_send (requester, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
-            zmq_recv (requester, packed_buffer, packed_size, 0);
+            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+            packed_buffer = zmq_msg_data(&zmq_msg);
             recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
             score = recvm->ncock;
             proto_char_message__free_unpacked(recvm, NULL);
