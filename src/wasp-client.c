@@ -57,6 +57,11 @@ int main(int argc, char *argv[])
 
     // send connection message
     ProtoCharMessage m;
+    
+    proto_char_message__init(&m); 
+    m.ch=malloc(sizeof(char));
+    m.password=malloc(50*sizeof(char));
+    m.cockdir=malloc(10*sizeof(ProtoDirection));
     m.msg_type = 6;
     m.ncock = nwasp;
     strcpy(m.password, password);
@@ -72,7 +77,8 @@ int main(int argc, char *argv[])
     zmq_msg_init (&zmq_msg);
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
     packed_buffer = zmq_msg_data(&zmq_msg);
-    ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    ProtoCharMessage *recvm=NULL;
+    recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
 
     //board already full of cockroaches or wasps
     if(recvm->ncock == 0){

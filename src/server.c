@@ -1696,6 +1696,7 @@ int main(int argc, char *argv[])
         else if(recvm->msg_type == 6){
             //number of wasps from this user
             ncock = recvm->ncock;
+            printf("%d", ncock);
             //check if there is no more space for wasps
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
@@ -1739,6 +1740,7 @@ int main(int argc, char *argv[])
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
                 *(recvm->ch) = total_cock;
+                recvm->ncock=ncock;
                 packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
                 proto_char_message__pack(recvm, packed_buffer);
