@@ -18,16 +18,16 @@ lizard-client: $(SRC_DIR)lizard-client.c $(SRC_DIR)remote-char.h
 	$(CC) $(CFLAGS) -o lizard-client $(SRC_DIR)lizard-client.c $(SRC_DIR)auxfuncs.c  $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c
 
 roaches-client: $(SRC_DIR)roaches-client.c $(SRC_DIR)remote-char.h
-	$(CC) $(CFLAGS) -o roaches-client $(SRC_DIR)roaches-client.c $(SRC_DIR)auxfuncs.c -lncurses -lzmq -lm
+	$(CC) $(CFLAGS) -o roaches-client $(SRC_DIR)roaches-client.c $(SRC_DIR)auxfuncs.c $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c
 
 wasp-client: $(SRC_DIR)wasp-client.c $(SRC_DIR)remote-char.h
-	$(CC) $(CFLAGS) -o wasp-client $(SRC_DIR)wasp-client.c $(SRC_DIR)auxfuncs.c -lncurses -lzmq -lm
+	$(CC) $(CFLAGS) -o wasp-client $(SRC_DIR)wasp-client.c $(SRC_DIR)auxfuncs.c $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c
 
 server: $(SRC_DIR)server.c $(SRC_DIR)remote-char.h
-	$(CC) $(CFLAGS) -o server $(SRC_DIR)server.c $(SRC_DIR)auxfuncs.c -lncurses -lzmq -lm
+	$(CC) $(CFLAGS) -o server $(SRC_DIR)server.c $(SRC_DIR)auxfuncs.c -lncurses $(SRC_DIR)message.pb-c.c -lzmq -lm -lprotobuf-c
 
 display-app: $(SRC_DIR)display-app.c $(SRC_DIR)remote-char.h
-	$(CC) $(CFLAGS) -o display-app $(SRC_DIR)display-app.c $(SRC_DIR)auxfuncs.c -lncurses -lzmq -lm
+	$(CC) $(CFLAGS) -o display-app $(SRC_DIR)display-app.c $(SRC_DIR)auxfuncs.c  -lncurses -lzmq -lm
 
 clean:
 	rm -rf bin

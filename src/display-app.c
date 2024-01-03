@@ -1,6 +1,7 @@
 #include <zmq.h>
 #include <ncurses.h>
 #include <stdbool.h>
+#include "message.pb-c.h"
 #include "remote-char.h"
 #include <unistd.h>
 #include <sys/types.h>
@@ -38,7 +39,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    remote_char_t m;
+    ProtoCharMessage m;
 
     if (argc != 4) {
         printf("Wrong number number of arguments\n");
@@ -87,7 +88,7 @@ int main(int argc, char *argv[])
 	wrefresh(my_win);
 
     //message from the server with a character's updated position
-    remote_display_t m2;
+    ProtoDisplayMessage m2;
     int n_chars;
     //joining server
     m.msg_type = 2;
@@ -123,7 +124,7 @@ int main(int argc, char *argv[])
         }
         else{
             wmove(my_win, m2.posx, m2.posy);
-            waddch(my_win,m2.ch| A_BOLD);
+            waddch(my_win,*(m2.ch)| A_BOLD);
             wrefresh(my_win);
         }   
     }

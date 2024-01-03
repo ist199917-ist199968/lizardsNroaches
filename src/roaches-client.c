@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
 
     //board already full of cockroaches
-    if(m.ncock == 0){
+    if(recvm->ncock == 0){
         printf("Tamos cheios :/\n");
         return 0;
     }
@@ -112,6 +112,7 @@ int main(int argc, char *argv[])
                 mvprintw(0,0,"%d Going Down   \n", n);
                 m.cockdir[i] = direction;
                 break;
+            default:
             case UP:
                 mvprintw(0,0,"%d Going Up    \n", n);
                 m.cockdir[i] = direction;
