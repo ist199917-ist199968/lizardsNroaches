@@ -1,6 +1,7 @@
 #include <zmq.h>
 #include <ncurses.h>
 #include "remote-char.h"
+#include "message.pb-c.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -55,12 +56,23 @@ int main(int argc, char *argv[])
     password[49]='\0';
 
     // send connection message
-    remote_char_t m;
+    ProtoCharMessage m;
     m.msg_type = 3;
     m.ncock = ncock;
     strcpy(m.password, password);
-    zmq_send (requester, &m, sizeof(m), 0);
-    zmq_recv (requester, &m, sizeof(m), 0);
+    
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t* packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
+   
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
+    ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
 
     //board already full of cockroaches
     if(m.ncock == 0){
@@ -72,7 +84,7 @@ int main(int argc, char *argv[])
     m.msg_type = 4;
 
     int sleep_delay;
-    direction_t direction;
+    ProtoDirection direction;
     int n = 0;
     int move;
     while (1)
@@ -111,8 +123,17 @@ int main(int argc, char *argv[])
         }
         refresh();
         //send the movement message
-        zmq_send (requester, &m, sizeof(m), 0);
-        zmq_recv (requester, &m, sizeof(m), 0);
+        packed_size = proto_char_message__get_packed_size(&m);
+        packed_buffer = malloc(packed_size);
+        proto_char_message__pack(&m, packed_buffer);
+        zmq_send (requester, packed_buffer, packed_size, 0);
+        free(packed_buffer);
+        packed_buffer=NULL;
+   
+        packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+        packed_buffer = zmq_msg_data(&zmq_msg);
+        recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+
     }
 
     zmq_close (requester);
