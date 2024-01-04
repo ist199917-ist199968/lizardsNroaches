@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
     packed_buffer = zmq_msg_data(&zmq_msg); 
-    recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
     
 
     //board already full of cockroaches or wasps
@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
         printf("Tamos cheios :/\n");
         return 0;
     }
+
     *(m.ch) = *(recvm->ch);
     proto_char_message__free_unpacked(recvm, NULL);
     recvm=NULL;
@@ -100,7 +101,7 @@ int main(int argc, char *argv[])
     int move;
     while (1)
     {
-        printf("Entered movement section\n");
+        //printf("Entered movement section\n");
         n++;
         sleep_delay = random()%700000;
         usleep(sleep_delay);

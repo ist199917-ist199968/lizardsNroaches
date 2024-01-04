@@ -963,7 +963,7 @@ int main(int argc, char *argv[])
                     k = random()%(WINDOW_SIZE-2) + 1;
                     l = random()%(WINDOW_SIZE-2) + 1;
                     //if it is a free space, a lizard body or another cockroach
-                    if(board[l][k].ch <= 46){
+                    if(board[l][k].ch <= 46 && board[l][k].ch != 35){
                         //save the cockroach data
                         ch = random()%5 + 1;
                         cock_data[total_cock + i].value = ch;
@@ -993,9 +993,9 @@ int main(int argc, char *argv[])
                 packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
                 proto_char_message__pack(recvm, packed_buffer);
-                zmq_send (publisher, packed_buffer, packed_size, 0);
+                zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
-                packed_buffer=NULL;                //update the number of cockroaches in the server
+                packed_buffer=NULL;                
                 proto_char_message__free_unpacked(recvm, NULL);
                 recvm=NULL;
                 total_cock = total_cock + ncock;
@@ -1004,7 +1004,7 @@ int main(int argc, char *argv[])
         //cockroach movement
         else if(recvm->msg_type == 4 && verify == true){
             ncock = recvm->ncock;
-            fcock = *(recvm->ch);
+            fcock = (int) *(recvm->ch);
             bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data

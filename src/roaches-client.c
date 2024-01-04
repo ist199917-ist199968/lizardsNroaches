@@ -73,13 +73,13 @@ int main(int argc, char *argv[])
     zmq_send (requester, packed_buffer, packed_size, 0);
     free(packed_buffer);
     packed_buffer=NULL;
-   
+    ProtoCharMessage *recvm=NULL;
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
+
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
     packed_buffer = zmq_msg_data(&zmq_msg);
-    ProtoCharMessage *recvm=NULL;
-    recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
     
     //board already full of cockroaches
     if(recvm->ncock == 0){
@@ -107,30 +107,31 @@ int main(int argc, char *argv[])
         for(int  i = 0; i < ncock; i++){
             move = random()%2;
             if(move == 1){
-            direction = random()%4;
+            direction = random()%(RIGHT+1);
 
             switch (direction)
             {
             case LEFT:
-                mvprintw(0,0,"%d Going Left   \n", n);
+                printf("%d Going Left   \n", n);
                 m.cockdir[i] = direction;
                 break;
             case RIGHT:
-                mvprintw(0,0,"%d Going Right   \n", n);
+                printf("%d Going Right   \n", n);
                 m.cockdir[i] = direction;
                 break;
             case DOWN:
-                mvprintw(0,0,"%d Going Down   \n", n);
+                printf("%d Going Down   \n", n);
                 m.cockdir[i] = direction;
                 break;
             default:
             case UP:
-                mvprintw(0,0,"%d Going Up    \n", n);
+                printf("%d Going Up    \n", n);
                 m.cockdir[i] = direction;
                 break;
             }
             }else{
                 m.cockdir[i] = 5;
+                printf("Cagada\n");
             }
         }
         refresh();
@@ -145,6 +146,8 @@ int main(int argc, char *argv[])
         packed_size=zmq_recvmsg(requester, &zmq_msg,0);
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+        proto_char_message__free_unpacked(recvm, NULL);
+        recvm=NULL;
 
     }
 
