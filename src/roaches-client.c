@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     m.ch=malloc(sizeof(char));
     m.password=malloc(50*sizeof(char));
     m.cockdir=malloc(10*sizeof(ProtoDirection));
-    
+    m.n_cockdir=10; 
     m.msg_type = 3;
     m.ncock = ncock;
     strcpy(m.password, password);
@@ -87,6 +87,10 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    *(m.ch) = *(recvm->ch);
+    proto_char_message__free_unpacked(recvm, NULL);
+    recvm=NULL;
+    
     //load the message information, m.ch is the first position
     m.msg_type = 4;
 

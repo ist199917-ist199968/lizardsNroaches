@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
     m.ch=malloc(sizeof(char));
     m.password=malloc(50*sizeof(char));
     m.cockdir=malloc(10*sizeof(ProtoDirection));
+    m.n_cockdir=10;
     m.msg_type = 6;
     m.ncock = nwasp;
     strcpy(m.password, password);
@@ -72,20 +73,24 @@ int main(int argc, char *argv[])
     zmq_send (requester, packed_buffer, packed_size, 0);
     free(packed_buffer);
     packed_buffer=NULL;
-   
+    ProtoCharMessage *recvm=NULL;
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
+
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
-    packed_buffer = zmq_msg_data(&zmq_msg);
-    ProtoCharMessage *recvm=NULL;
+    packed_buffer = zmq_msg_data(&zmq_msg); 
     recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    
 
     //board already full of cockroaches or wasps
     if(recvm->ncock == 0){
         printf("Tamos cheios :/\n");
         return 0;
     }
-
+    *(m.ch) = *(recvm->ch);
+    proto_char_message__free_unpacked(recvm, NULL);
+    recvm=NULL;
+    
     //load the message information, m.ch is the first position
     m.msg_type = 7;
 
@@ -95,6 +100,7 @@ int main(int argc, char *argv[])
     int move;
     while (1)
     {
+        printf("Entered movement section\n");
         n++;
         sleep_delay = random()%700000;
         usleep(sleep_delay);
@@ -102,30 +108,31 @@ int main(int argc, char *argv[])
         for(int  i = 0; i < nwasp; i++){
             move = random()%2;
             if(move == 1){
-            direction = random()%4;
+            direction = random()%(RIGHT+1);
 
             switch (direction)
             {
             case LEFT:
-                mvprintw(0,0,"%d Going Left   \n", n);
+                printf("%d Going Left   \n", n);
                 m.cockdir[i] = direction;
                 break;
             case RIGHT:
-                mvprintw(0,0,"%d Going Right   \n", n);
+                printf("%d Going Right   \n", n);
                 m.cockdir[i] = direction;
                 break;
             case DOWN:
-                mvprintw(0,0,"%d Going Down   \n", n);
+                printf("%d Going Down   \n", n);
                 m.cockdir[i] = direction;
                 break;
             default:
             case UP:
-                mvprintw(0,0,"%d Going Up    \n", n);
+                printf("%d Going Up    \n", n);
                 m.cockdir[i] = direction;
                 break;
             }
             }else{
                 m.cockdir[i] = 5;
+                printf("Cagada\n");
             }
         }
         refresh();
@@ -140,6 +147,8 @@ int main(int argc, char *argv[])
         packed_size=zmq_recvmsg(requester, &zmq_msg,0);
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+        proto_char_message__free_unpacked(recvm, NULL);
+        recvm=NULL;
 
     }
 

@@ -174,11 +174,6 @@ int main(int argc, char *argv[])
         memset(char_data[c].password,'\0', sizeof(char_data[c].password));
     
     int n_chars = 0;
-    ProtoCharMessage m;
-    proto_char_message__init(&m);
-    m.ch=malloc(sizeof(char));
-    m.password=malloc(sizeof(char)*50);
-    m.cockdir=malloc(sizeof(ProtoDirection)*10);
     ProtoDisplayMessage m2;
     proto_display_message__init(&m2);
     m2.ch=malloc(sizeof(char));
@@ -242,23 +237,30 @@ int main(int argc, char *argv[])
     uint8_t* packed_buffer;
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
+    ProtoCharMessage *recvm = NULL;
     while (1)
     {
-        packed_size=zmq_recvmsg(responder, &zmq_msg,0);
-        ProtoCharMessage *recvm = NULL;
+        packed_size=zmq_recvmsg(responder, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+        
+        if(recvm->msg_type == 0 || recvm->msg_type == 2 || recvm->msg_type == 3 || recvm->msg_type == 6)
+            verify=true;
+
         if(recvm->msg_type == 1 || recvm->msg_type == 5){
+            verify=false;
             i = find_ch_info(char_data, n_chars, *(recvm->ch));
             if(strcmp(char_data[i].password, recvm->password) != 0){
                 verify = false;
-                printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, m.password);
+                printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, recvm->password);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 proto_char_message__free_unpacked(recvm, NULL);
                 recvm=NULL;
 
             } else{verify = true;}
+        
         }else if(recvm->msg_type == 4 || recvm->msg_type == 7){
+            verify=false;
             for(i = *(recvm->ch); i < *(recvm->ch) + (recvm->ncock); i++){
                 if(strcmp(cock_data[i].password, recvm->password) != 0){
                     verify = false;
@@ -269,6 +271,7 @@ int main(int argc, char *argv[])
                 }else{verify = true;}
             }
         }
+        if(verify==true){
         //new lizard character joins
         if(recvm->msg_type == 0){
             //max players
@@ -762,6 +765,10 @@ int main(int argc, char *argv[])
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
+
+
             }
             //draw lizard tail
             switch (direction)
@@ -946,7 +953,10 @@ int main(int argc, char *argv[])
                 proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
-                packed_buffer=NULL;            }else{                
+                packed_buffer=NULL; 
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
+                }else{                
                 //random position for each cockroach
                 i = 0;
                 while(i != ncock){
@@ -960,7 +970,7 @@ int main(int argc, char *argv[])
                         cock_data[total_cock + i].posx = k;
                         cock_data[total_cock + i].posy = l;
                         board[l][k].ch = ch;
-                        strcpy(cock_data[total_cock + i].password, m.password);
+                        strcpy(cock_data[total_cock + i].password, recvm->password);
                         //print the cockroach
                         wmove(my_win, k, l);
                         waddch(my_win, (ch + '0')| A_BOLD);
@@ -986,12 +996,14 @@ int main(int argc, char *argv[])
                 zmq_send (publisher, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;                //update the number of cockroaches in the server
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
                 total_cock = total_cock + ncock;
             }
         }
         //cockroach movement
         else if(recvm->msg_type == 4 && verify == true){
-            ncock = m.ncock;
+            ncock = recvm->ncock;
             fcock = *(recvm->ch);
             bool winner = false;
             for(i = 0; i < ncock; i++){
@@ -1276,12 +1288,14 @@ int main(int argc, char *argv[])
             }
             }
             wrefresh(my_win);
-            packed_size = proto_char_message__get_packed_size(&m);
+            packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
-            proto_char_message__pack(&m, packed_buffer);
+            proto_char_message__pack(recvm, packed_buffer);
             zmq_send (responder, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
         } 
         //lizard disconnect
         else if(recvm->msg_type == 5 && verify == true){
@@ -1293,6 +1307,10 @@ int main(int argc, char *argv[])
             packed_buffer=NULL;
             
             int ch_pos = find_ch_info(char_data, n_chars, *(recvm->ch));
+            
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
+            
             bool winner = char_data[ch_pos].win;
             pos_x = char_data[ch_pos].pos_x;
             pos_y = char_data[ch_pos].pos_y;
@@ -1707,6 +1725,9 @@ int main(int argc, char *argv[])
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
+
             }else{                
                 //random position for each cockroach
                 i = 0;
@@ -1720,7 +1741,7 @@ int main(int argc, char *argv[])
                         cock_data[total_cock + i].posx = k;
                         cock_data[total_cock + i].posy = l;
                         board[l][k].ch = '#';
-                        strcpy(cock_data[total_cock + i].password, m.password);
+                        strcpy(cock_data[total_cock + i].password, recvm->password);
                         //print the wasp
                         wmove(my_win, k, l);
                         waddch(my_win, '#'| A_BOLD);
@@ -1731,7 +1752,7 @@ int main(int argc, char *argv[])
                         packed_size = proto_display_message__get_packed_size(&m2);
                         packed_buffer = malloc(packed_size);
                         proto_display_message__pack(&m2, packed_buffer);
-                        zmq_send (responder, packed_buffer, packed_size, 0);
+                        zmq_send (publisher, packed_buffer, packed_size, 0);
                         free(packed_buffer);
                         packed_buffer=NULL;
                         i++;
@@ -1740,13 +1761,14 @@ int main(int argc, char *argv[])
                 wrefresh(my_win);
                 //send the position of the first cockroach in the data array
                 *(recvm->ch) = total_cock;
-                recvm->ncock=ncock;
                 packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
                 proto_char_message__pack(recvm, packed_buffer);
                 zmq_send (responder, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
+                proto_char_message__free_unpacked(recvm, NULL);
+                recvm=NULL;
                 //update the number of cockroaches in the server
                 total_cock = total_cock + ncock;
             }
@@ -1754,7 +1776,7 @@ int main(int argc, char *argv[])
         //wasp movement
         else if(recvm->msg_type == 7 && verify == true){
             ncock = recvm->ncock;
-            fcock = *(recvm->ch);
+            fcock = (int) *(recvm->ch);
             int ch_pos;
             bool winner = false;
             for(i = 0; i < ncock; i++){
@@ -2086,12 +2108,15 @@ int main(int argc, char *argv[])
 
             }
             wrefresh(my_win);
-            packed_size = proto_char_message__get_packed_size(&m);
+            packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
-            proto_char_message__pack(&m, packed_buffer);
+            proto_char_message__pack(recvm, packed_buffer);
             zmq_send (responder, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
+        }
         }
     }
   	
