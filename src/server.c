@@ -55,6 +55,11 @@ typedef struct cockroach_info_t
 
 } cockroach_info_t;
 
+typedef struct msgNsock{
+    ProtoCharMessage *recvm;
+    void *socket;
+}msgNsock;
+
 //create mutex
 pthread_mutex_t mutex_lizard_queue = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_roach_queue = PTHREAD_MUTEX_INITIALIZER;
