@@ -28,6 +28,16 @@ typedef struct remote_display_t
 
 }remote_display_t;
 */
+struct node{
+    struct node* next;
+    ProtoCharMessage *msg;
+};
+typedef struct node node_t;
 
+extern node_t* head[2];
+extern node_t* tail[2];
+void initializeQueues();
+void enqueue(ProtoCharMessage *msg, int id);
+ProtoCharMessage *dequeue(int id);
 bool Is_ValidIPv4(const char *candidate);
 bool Is_ValidPort(const char *candidate);
