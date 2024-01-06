@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <zmq.h>
 #include <ncurses.h>
 #include "remote-char.h"
@@ -11,10 +12,32 @@
 #include <fcntl.h>
 #include <ctype.h>
 
+void *requester=NULL;
+ProtoCharMessage m;
+
+void sigintHandler(int signum) {
+    m.msg_type=8;
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t* packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
+    ProtoCharMessage *recvm=NULL;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
+    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    exit(signum);
+
+}
+
 int main(int argc, char *argv[])
 {	 
     srand((unsigned int) time(NULL));
-
+    signal(SIGINT, sigintHandler);
     if (argc != 3) {
         printf("Wrong number number of arguments\n");
         return 1;
@@ -35,7 +58,7 @@ int main(int argc, char *argv[])
     strcat(candidate1, port1);
    
     void *context = zmq_ctx_new ();
-    void *requester = zmq_socket (context, ZMQ_REQ);
+    requester = zmq_socket (context, ZMQ_REQ);
     zmq_connect (requester, candidate1);
 
     // read number of cockroaches from the user
@@ -50,7 +73,7 @@ int main(int argc, char *argv[])
     } while (ncock < 1 || ncock > 10);
 
     char password[50];
-    for(int i = 0; i < 50; i++){
+    for(int i = 0; i < 49; i++){
         password[i] = (char) random()%94 + 32;
     }
     password[49]='\0';
@@ -66,7 +89,8 @@ int main(int argc, char *argv[])
     m.msg_type = 3;
     m.ncock = ncock;
     strcpy(m.password, password);
-    
+    m.password[49]='\0';
+    supressSIGINT();
     size_t packed_size = proto_char_message__get_packed_size(&m);
     uint8_t* packed_buffer = malloc(packed_size);
     proto_char_message__pack(&m, packed_buffer);
@@ -79,8 +103,7 @@ int main(int argc, char *argv[])
 
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
     packed_buffer = zmq_msg_data(&zmq_msg);
-    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
-    
+    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);    
     //board already full of cockroaches
     if(recvm->ncock == 0){
         printf("Tamos cheios :/\n");
@@ -90,7 +113,7 @@ int main(int argc, char *argv[])
     *(m.ch) = *(recvm->ch);
     proto_char_message__free_unpacked(recvm, NULL);
     recvm=NULL;
-    
+    allowSIGINT();
     //load the message information, m.ch is the first position
     m.msg_type = 4;
 
@@ -131,11 +154,12 @@ int main(int argc, char *argv[])
             }
             }else{
                 m.cockdir[i] = 5;
-                printf("Cagada\n");
+                printf("A mimir\n");
             }
         }
         refresh();
         //send the movement message
+        supressSIGINT(); 
         packed_size = proto_char_message__get_packed_size(&m);
         packed_buffer = malloc(packed_size);
         proto_char_message__pack(&m, packed_buffer);
@@ -148,7 +172,7 @@ int main(int argc, char *argv[])
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
         proto_char_message__free_unpacked(recvm, NULL);
         recvm=NULL;
-
+        allowSIGINT();
     }
 
     zmq_close (requester);

@@ -74,6 +74,13 @@ void sigintHandler(int signum) {
 
 void *display (void *arg){
     ProtoCharMessage m;
+    
+    size_t packed_size;
+    uint8_t* packed_buffer;
+    ProtoDisplayMessage *recvm = NULL;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init(&zmq_msg);
+
     proto_char_message__init(&m); 
     m.msg_type = 0;
     m.ch=malloc(sizeof(char));
@@ -88,7 +95,7 @@ void *display (void *arg){
 	wrefresh(my_win);
 
     //message from the server with a character's updated position
-    ProtoDisplayMessage m2;
+   // ProtoDisplayMessage m2;
     int n_chars;
     //joining server
     
@@ -103,116 +110,40 @@ void *display (void *arg){
     wrefresh(my_win);
     while (1)
     {
-        zmq_recv (subscriber, &m2, sizeof(m2), 0);
-        if(m2.posx == 999){//flag for scoreboard print
-            n_chars = m2.posy;
+        //zmq_recv (subscriber, &m2, sizeof(m2), 0);
+
+        packed_size=zmq_recvmsg(subscriber, &zmq_msg,0); 
+        packed_buffer = zmq_msg_data(&zmq_msg);
+        recvm=proto_display_message__unpack(NULL, packed_size, packed_buffer);
+        
+        if(recvm->posx == 999){//flag for scoreboard print
+            n_chars = recvm->posy;
             mvprintw(0, WINDOW_SIZE + 1,"Scoreboard");
             //delete previous scoreboard
             for(int i = 0; i < MAX_PLAYERS; i++){
                 mvprintw(i + 2, WINDOW_SIZE + 1,"               ");
             }
+
             //print new scoreboard
+            
             for(int i = 0; i < n_chars; i++){
-                zmq_recv (subscriber, &m2, sizeof(m2), 0);
-                mvprintw(i + 2, WINDOW_SIZE + 1,"%c score: %d", m2.posx , m2.score);
+                //zmq_recv (subscriber, &m2, sizeof(m2), 0);
+                packed_size=zmq_recvmsg(subscriber, &zmq_msg,0); 
+                packed_buffer = zmq_msg_data(&zmq_msg);
+                recvm=proto_display_message__unpack(NULL, packed_size, packed_buffer);
+
+                mvprintw(i + 2, WINDOW_SIZE + 1,"%c score: %d", recvm->posx , recvm->score);
             }
             refresh();
             box(my_win, 0 , 0);
         }
         else{
-            wmove(my_win, m2.posx, m2.posy);
-            waddch(my_win,*(m2.ch)| A_BOLD);
+            wmove(my_win, recvm->posx, recvm->posy);
+            waddch(my_win,*(recvm->ch)| A_BOLD);
             wrefresh(my_win);
         }   
     }
     return 0;   
-}
-
-void *controller (void *arg){
-    ProtoCharMessage m;
-    m.ch=malloc(sizeof(char));
-    m.password=malloc(50*sizeof(char));
-    strcpy(m.password, password);
-    zmq_msg_t zmq_msg;
-    zmq_msg_init (&zmq_msg);
-    size_t packed_size;
-    uint8_t *packed_buffer;
-    ProtoCharMessage *recvm=NULL;
-    
-    m.msg_type = 1;
-    m.ch = &ch;
-    int key, score, n = 0;
-    while(1){
-    	key = getch();	
-        n++;
-
-        switch (key)
-        {
-        case KEY_LEFT:
-            //mvprintw(3,0,"%d Left arrow is pressed", n);
-            // prepare the movement message
-           m.direction = PROTO_DIRECTION__LEFT;
-            break;
-        case KEY_RIGHT:
-            //mvprintw(3,0,"%d Right arrow is pressed", n);
-            // prepare the movement message
-            m.direction = PROTO_DIRECTION__RIGHT;
-            break;
-        case KEY_DOWN:
-            //mvprintw(3,0,"%d Down arrow is pressed", n);
-            // prepare the movement message
-           m.direction = PROTO_DIRECTION__DOWN;
-            break;
-        case KEY_UP:
-            //mvprintw(3,0,"%d :Up arrow is pressed", n);
-            // prepare the movement message
-            m.direction = PROTO_DIRECTION__UP;
-            break;
-        
-        case 'q':
-        case 'Q':
-            m.msg_type = 5;
-            packed_size = proto_char_message__get_packed_size(&m);
-            packed_buffer = malloc(packed_size);
-            proto_char_message__pack(&m, packed_buffer);
-            zmq_send (requester, packed_buffer, packed_size, 0);
-            free(packed_buffer);
-            packed_buffer=NULL;
-            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
-            packed_buffer = zmq_msg_data(&zmq_msg);
-            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
-            proto_char_message__free_unpacked(recvm, NULL);
-            recvm=NULL;
-            endwin();
-            free(candidate1);
-            zmq_close (requester);
-            zmq_ctx_destroy (context);
-            exit(0);
-            break;
-        
-        default:
-            key = 'x'; 
-            break;
-        }
-
-        //send the movement message
-        if (key != 'x'){
-            packed_size = proto_char_message__get_packed_size(&m);
-            packed_buffer = malloc(packed_size);
-            proto_char_message__pack(&m, packed_buffer);
-            zmq_send (requester, packed_buffer, packed_size, 0);
-            free(packed_buffer);
-            packed_buffer=NULL;
-            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
-            packed_buffer = zmq_msg_data(&zmq_msg);
-            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
-            score = recvm->ncock;
-            proto_char_message__free_unpacked(recvm, NULL);
-            recvm=NULL;
-            //mvprintw(1,0,"Score - %d", score);
-        }
-        refresh();			/* Print it on to the real screen */
-    };
 }
 
 
@@ -338,21 +269,83 @@ int main(int argc, char *argv[])
     //mvprintw(0,0,"Player %c", ch);
     // prepare the movement message
     
-    if (pthread_create(&threadController, NULL, controller, NULL) != 0) {
-        fprintf(stderr, "Error creating thread A\n");
-        return 1;
-    }
-   
     if (pthread_create(&threadDisplay, NULL, display, NULL) != 0) {
         fprintf(stderr, "Error creating thread A\n");
         return 1;
     }
-   
-   //TODO: probably just move one of the threads to this loop
+
+    m.msg_type = 1;
+    m.ch = &ch;
+    int key, score, n = 0;
     while(1){
+    	key = getch();	
+        n++;
 
-    }
+        switch (key)
+        {
+        case KEY_LEFT:
+            //mvprintw(3,0,"%d Left arrow is pressed", n);
+            // prepare the movement message
+           m.direction = PROTO_DIRECTION__LEFT;
+            break;
+        case KEY_RIGHT:
+            //mvprintw(3,0,"%d Right arrow is pressed", n);
+            // prepare the movement message
+            m.direction = PROTO_DIRECTION__RIGHT;
+            break;
+        case KEY_DOWN:
+            //mvprintw(3,0,"%d Down arrow is pressed", n);
+            // prepare the movement message
+           m.direction = PROTO_DIRECTION__DOWN;
+            break;
+        case KEY_UP:
+            //mvprintw(3,0,"%d :Up arrow is pressed", n);
+            // prepare the movement message
+            m.direction = PROTO_DIRECTION__UP;
+            break;
+        
+        case 'q':
+        case 'Q':
+            m.msg_type = 5;
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (requester, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+            packed_buffer = zmq_msg_data(&zmq_msg);
+            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
+            endwin();
+            free(candidate1);
+            zmq_close (requester);
+            zmq_ctx_destroy (context);
+            exit(0);
+            break;
+        
+        default:
+            key = 'x'; 
+            break;
+        }
 
+        //send the movement message
+        if (key != 'x'){
+            packed_size = proto_char_message__get_packed_size(&m);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(&m, packed_buffer);
+            zmq_send (requester, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+            packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+            packed_buffer = zmq_msg_data(&zmq_msg);
+            recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer); 
+            proto_char_message__free_unpacked(recvm, NULL);
+            recvm=NULL;
+            //mvprintw(1,0,"Score - %d", score);
+        }
+    };
     free(candidate1);
     zmq_close (requester);
     zmq_ctx_destroy (context);

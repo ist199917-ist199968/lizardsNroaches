@@ -29,5 +29,7 @@ typedef struct remote_display_t
 }remote_display_t;
 */
 
+void supressSIGINT();
+void allowSIGINT();
 bool Is_ValidIPv4(const char *candidate);
 bool Is_ValidPort(const char *candidate);

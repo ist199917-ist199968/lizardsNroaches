@@ -11,8 +11,29 @@
 #include <fcntl.h>
 #include <ctype.h>
 
-int main(int argc, char *argv[])
-{	 
+ProtoCharMessage m;
+void *requester;
+
+void sigintHandler(int signum) {
+    m.msg_type=8;
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t* packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
+    ProtoCharMessage *recvm=NULL;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
+    recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    exit(signum);
+
+}
+
+int main(int argc, char *argv[]){	 
     srand((unsigned int) time(NULL));
 
     if (argc != 3) {
@@ -35,7 +56,7 @@ int main(int argc, char *argv[])
     strcat(candidate1, port1);
    
     void *context = zmq_ctx_new ();
-    void *requester = zmq_socket (context, ZMQ_REQ);
+    requester = zmq_socket (context, ZMQ_REQ);
     zmq_connect (requester, candidate1);
 
     // read number of wasps from the user
@@ -56,8 +77,7 @@ int main(int argc, char *argv[])
     password[49]='\0';
 
     // send connection message
-    ProtoCharMessage m;
-    
+        
     proto_char_message__init(&m); 
     m.ch=malloc(sizeof(char));
     m.password=malloc(50*sizeof(char));
@@ -76,7 +96,7 @@ int main(int argc, char *argv[])
     ProtoCharMessage *recvm=NULL;
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
-
+    supressSIGINT();
     packed_size=zmq_recvmsg(requester, &zmq_msg,0);
     packed_buffer = zmq_msg_data(&zmq_msg); 
     recvm = proto_char_message__unpack(NULL, packed_size, packed_buffer);
@@ -91,7 +111,7 @@ int main(int argc, char *argv[])
     *(m.ch) = *(recvm->ch);
     proto_char_message__free_unpacked(recvm, NULL);
     recvm=NULL;
-    
+    allowSIGINT();
     //load the message information, m.ch is the first position
     m.msg_type = 7;
 
@@ -138,6 +158,7 @@ int main(int argc, char *argv[])
         }
         refresh();
         //send the movement message
+        supressSIGINT();
         packed_size = proto_char_message__get_packed_size(&m);
         packed_buffer = malloc(packed_size);
         proto_char_message__pack(&m, packed_buffer);
@@ -150,6 +171,7 @@ int main(int argc, char *argv[])
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
         proto_char_message__free_unpacked(recvm, NULL);
         recvm=NULL;
+        allowSIGINT();
 
     }
 

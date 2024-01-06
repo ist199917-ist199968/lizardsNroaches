@@ -7,6 +7,21 @@
 #include <string.h>
 #include "message.pb-c.h"
 #include "remote-char.h"
+#include <signal.h>
+
+void supressSIGINT(){
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+}
+
+void allowSIGINT(){
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+}
 
 bool Is_ValidIPv4(const char *candidate){
     in_addr_t ip;
