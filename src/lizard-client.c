@@ -149,6 +149,7 @@ void *display (void *arg){
 
 int main(int argc, char *argv[])
 {
+    signal(SIGINT, sigintHandler); /*log handler*/
     pthread_t threadController, threadDisplay;
     srand((unsigned int) time(NULL));
     if (argc != 4) {
@@ -185,8 +186,6 @@ int main(int argc, char *argv[])
     assert (rc == 0);
     rc = zmq_setsockopt (subscriber, ZMQ_SUBSCRIBE, "", 0);
     assert (rc == 0);
-
-    signal(SIGINT, sigintHandler); /*log handler*/
 
     // read the character from the user
     do{
@@ -345,7 +344,7 @@ int main(int argc, char *argv[])
             recvm=NULL;
             //mvprintw(1,0,"Score - %d", score);
         }
-    };
+    }
     free(candidate1);
     zmq_close (requester);
     zmq_ctx_destroy (context);

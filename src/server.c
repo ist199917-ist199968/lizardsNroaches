@@ -22,8 +22,9 @@
 time_t start_time;
 
 pthread_mutex_t lizard_dealer_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t roach_dealer_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t display_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t roach_dealer_mutex = PTHREAD_MUTEX_INITIALIZER; //provavelmente nao precisa pq é só uma thread
+pthread_mutex_t mutex_test1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_test2 = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct ch_info_t
 {
@@ -69,7 +70,7 @@ int total_cock = 0;
 WINDOW * my_win = NULL;
 void *publisher = NULL;
 char *candidate1;
-
+int teste = 0;
 //find what's under; 0 = blank space, 8 = winner body '*'; 9 = lizard body '.'; value = cockroach value; 7 = wasp 
 int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid, bool is_winner){
     
@@ -203,8 +204,11 @@ void *lizard_function(void *context){
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
         pthread_mutex_unlock(&lizard_dealer_mutex);
-        //printf("Recebido L\n");
-
+        pthread_mutex_lock(&mutex_test1);
+        mvprintw(WINDOW_SIZE + 2, 0,"ALLO %d", teste);
+        wrefresh(my_win);
+        refresh();
+        teste++;
         //new lizard character joins
         if(recvm->msg_type == 0){
             //max players
@@ -258,14 +262,12 @@ void *lizard_function(void *context){
                             wmove(my_win, pos_x + i, pos_y);
                             waddch(my_win, '.'| A_BOLD);
                             board[pos_y][pos_x + i].ch = '.';
-                            pthread_mutex_lock(&display_mutex);
                             *(m2.ch) = '.';
                             m2.posx = pos_x + i;
                             m2.posy = pos_y;
                             packed_size = proto_display_message__get_packed_size(&m2);
                             packed_buffer = malloc(packed_size);
                             proto_display_message__pack(&m2, packed_buffer);
-                            pthread_mutex_unlock(&display_mutex);
                             zmq_send (publisher, packed_buffer, packed_size, 0);
                             free(packed_buffer);
                             packed_buffer=NULL;
@@ -282,14 +284,12 @@ void *lizard_function(void *context){
             waddch(my_win, ch| A_BOLD);
             scoreboard(char_data, n_chars);
             wrefresh(my_win);	
-            pthread_mutex_lock(&display_mutex);
             *(m2.ch) = ch;
             m2.posx = pos_x;
             m2.posy = pos_y;	
             packed_size = proto_display_message__get_packed_size(&m2);
             packed_buffer = malloc(packed_size);
             proto_display_message__pack(&m2, packed_buffer);
-            pthread_mutex_unlock(&display_mutex);
             zmq_send (publisher, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
@@ -313,14 +313,12 @@ void *lizard_function(void *context){
                 board[pos_y][pos_x].ch = ' ';
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win,' ');
-                pthread_mutex_lock(&display_mutex);
                 *(m2.ch) = ' ';
                 m2.posx = pos_x;
                 m2.posy = pos_y;	
                 packed_size = proto_display_message__get_packed_size(&m2);
                 packed_buffer = malloc(packed_size);
                 proto_display_message__pack(&m2, packed_buffer);
-                pthread_mutex_unlock(&display_mutex);
                 zmq_send (publisher, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
@@ -336,75 +334,65 @@ void *lizard_function(void *context){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x + i].ch = ' ';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = ' ';
+                                    *(m2.ch) = ' ';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '#';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = '#';
+                                    *(m2.ch) = '#';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '*';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = '*';
+                                    *(m2.ch) = '*';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x + i].ch = '.';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = '.';
+                                    *(m2.ch) = '.';
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
-                                packed_buffer=NULL; //STOPPED CONVERTING HERE. TOMORROW WILL FINISH
+                                packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x + i].ch = under;
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = (char)(under + '0');
+                                    *(m2.ch) = (char)(under + '0');
                                 m2.posx = pos_x + i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }
@@ -426,75 +414,65 @@ void *lizard_function(void *context){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
                                 board[pos_y][pos_x - i].ch = ' ';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = ' ';
+                                    *(m2.ch) = ' ';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '#'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '#';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch) = '#';
+                                    *(m2.ch) = '#';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '*';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '*';
+                                    *(m2.ch)= '*';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y][pos_x - i].ch = '.';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '.';
+                                    *(m2.ch)= '.';
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y][pos_x - i].ch = under;
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= (char)(under + '0');
+                                    *(m2.ch)= (char)(under + '0');
                                 m2.posx = pos_x - i;
                                 m2.posy = pos_y;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }
@@ -516,75 +494,65 @@ void *lizard_function(void *context){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
                                 board[pos_y + i][pos_x].ch = ' ';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= ' ';
+                                    *(m2.ch)= ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '#'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '#';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '#';
+                                    *(m2.ch)= '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '*';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '*';
+                                    *(m2.ch)= '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y + i][pos_x].ch = '.';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '.';
+                                    *(m2.ch)= '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y + i][pos_x].ch = under;
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= (char)(under + '0');
+                                    *(m2.ch)= (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y + i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }
@@ -606,75 +574,65 @@ void *lizard_function(void *context){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
                                 board[pos_y - i][pos_x].ch = ' ';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= ' ';
+                                    *(m2.ch)= ' ';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 7){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '#'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '#';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '#';
+                                    *(m2.ch)= '#';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 8){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '*'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '*';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '*';
+                                    *(m2.ch)= '*';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else if(under == 9){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, '.'| A_BOLD);
                                 board[pos_y - i][pos_x].ch = '.';
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= '.';
+                                    *(m2.ch)= '.';
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }else{
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, (under + '0')| A_BOLD);
                                 board[pos_y - i][pos_x].ch = under;
-                                pthread_mutex_lock(&display_mutex);
-                                *(m2.ch)= (char)(under + '0');
+                                    *(m2.ch)= (char)(under + '0');
                                 m2.posx = pos_x;
                                 m2.posy = pos_y - i;	
                                 packed_size = proto_display_message__get_packed_size(&m2);
                                 packed_buffer = malloc(packed_size);
                                 proto_display_message__pack(&m2, packed_buffer);
-                                pthread_mutex_unlock(&display_mutex);
-                                zmq_send (publisher, packed_buffer, packed_size, 0);
+                                    zmq_send (publisher, packed_buffer, packed_size, 0);
                                 free(packed_buffer);
                                 packed_buffer=NULL;
                             }
@@ -769,7 +727,12 @@ void *lizard_function(void *context){
                             }
                             m2.posx = pos_x + i;
                             m2.posy = pos_y;	
-                            zmq_send (publisher, &m2, sizeof(m2), 0);
+                            packed_size = proto_display_message__get_packed_size(&m2);
+                            packed_buffer = malloc(packed_size);
+                            proto_display_message__pack(&m2, packed_buffer);
+                            zmq_send (publisher, packed_buffer, packed_size, 0);
+                            free(packed_buffer);
+                            packed_buffer=NULL;
                         }
                         board[pos_y][pos_x + i].nlayers++;
                         if(char_data[ch_pos].win == true)
@@ -1334,6 +1297,7 @@ void *lizard_function(void *context){
             wrefresh(my_win);
         }
 
+        pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
 }
@@ -1345,7 +1309,6 @@ void *roach_function(void *context){
     m2.ch=malloc(sizeof(char));
     void *responder = zmq_socket(context, ZMQ_REP);
     zmq_connect(responder, "inproc://mydealer2");
-    //printf("BBB\n");
     while(1){
 
         int ch;
@@ -1363,7 +1326,6 @@ void *roach_function(void *context){
         packed_size=zmq_recvmsg(responder, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
-        //printf("Recebido R\n");
         //cockroach joins
         if(recvm->msg_type == 3){
             //number of cockroaches from this user
