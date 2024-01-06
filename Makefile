@@ -15,7 +15,7 @@ all: lizard-client roaches-client wasp-client server display-app
 	mv display-app bin/remote-display/
 	mv server bin/server/
 lizard-client: $(SRC_DIR)lizard-client.c $(SRC_DIR)remote-char.h
-	$(CC) $(CFLAGS) -o lizard-client $(SRC_DIR)lizard-client.c $(SRC_DIR)auxfuncs.c  $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c
+	$(CC) $(CFLAGS) -o lizard-client $(SRC_DIR)lizard-client.c $(SRC_DIR)auxfuncs.c  $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c -lpthread
 
 roaches-client: $(SRC_DIR)roaches-client.c $(SRC_DIR)remote-char.h
 	$(CC) $(CFLAGS) -o roaches-client $(SRC_DIR)roaches-client.c $(SRC_DIR)auxfuncs.c $(SRC_DIR)message.pb-c.c -lncurses -lzmq -lm -lprotobuf-c
