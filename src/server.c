@@ -17,7 +17,7 @@
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
 #define MAX_PLAYERS 26
 #define LIZARD_THREADS 4
-#define ROACH_THREADS 2
+#define ROACH_THREADS 1
 
 time_t start_time;
 
