@@ -87,7 +87,6 @@ void inactive() {
     m.direction = 0;
     strcpy(m.password, password);
     
-    trabalha=false;
     m.msg_type = 5;
     size_t packed_size = proto_char_message__get_packed_size(&m);
     uint8_t *packed_buffer = malloc(packed_size);
@@ -116,6 +115,7 @@ void inactive() {
         
         case 'q':
         case 'Q':
+            trabalha=false;
             endwin();
             free(candidate1);
             zmq_close (requester);
@@ -213,7 +213,6 @@ void *display (){
 
 int main(int argc, char *argv[]){
 
-    time_t seconds_sinceActive=0;
     signal(SIGINT, sigintHandler); /*log handler*/
     pthread_t threadDisplay;
     srand((unsigned int) time(NULL));
@@ -339,6 +338,7 @@ int main(int argc, char *argv[]){
     m.msg_type = 1;
     m.ch = &ch;
     int key, n = 0;
+    timeout(60000);
     while(1){
     	key = getch();	
         n++;
@@ -387,7 +387,9 @@ int main(int argc, char *argv[]){
             zmq_ctx_destroy (context);
             exit(0);
             break;
-        
+        case ERR:
+            inactive();
+            break;
         default:
             key = 'x'; 
             break;
@@ -395,7 +397,6 @@ int main(int argc, char *argv[]){
 
         //send the movement message
         if (key != 'x'){
-            seconds_sinceActive=0;
             packed_size = proto_char_message__get_packed_size(&m);
             packed_buffer = malloc(packed_size);
             proto_char_message__pack(&m, packed_buffer);
@@ -409,9 +410,7 @@ int main(int argc, char *argv[]){
             recvm=NULL;
             //mvprintw(1,0,"Score - %d", score);
         }
-        if(seconds_sinceActive >=60)
-            inactive();
-    }
+     }
     free(candidate1);
     zmq_close (requester);
     zmq_ctx_destroy (context);
