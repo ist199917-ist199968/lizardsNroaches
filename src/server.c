@@ -17,14 +17,18 @@
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
 #define MAX_PLAYERS 26
 #define LIZARD_THREADS 4
-#define ROACH_THREADS 1
+#define ROACH_THREADS 2
 
 time_t start_time;
 
-pthread_mutex_t lizard_dealer_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t roach_dealer_mutex = PTHREAD_MUTEX_INITIALIZER; //provavelmente nao precisa pq é só uma thread
 pthread_mutex_t mutex_test1 = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_test2 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_board = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_chardata = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_cockdata = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_n_chars = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_total_cock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_my_win = PTHREAD_MUTEX_INITIALIZER;
+
 
 typedef struct ch_info_t
 {
@@ -199,18 +203,19 @@ void *lizard_function(void *context){
         zmq_msg_t zmq_msg;
         zmq_msg_init(&zmq_msg);
     
-        //pthread_mutex_lock(&lizard_dealer_mutex);
         packed_size=zmq_recvmsg(responder, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
-        //pthread_mutex_unlock(&lizard_dealer_mutex);
 
         if(recvm->msg_type == 0 || recvm->msg_type == 2)
             verify=true;
 
         if(recvm->msg_type == 1 || recvm->msg_type == 5){
             verify=false;
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             i = find_ch_info(char_data, n_chars, *(recvm->ch));
+            pthread_mutex_unlock(&mutex_n_chars);
             if(strcmp(char_data[i].password, recvm->password) != 0){
                 verify = false;
                 //printf("Rejected package with wrong password: %s is diff from %s\n", char_data[i].password, recvm->password);
@@ -219,14 +224,15 @@ void *lizard_function(void *context){
                 recvm=NULL;
 
             } else{verify = true;}
-        
+            pthread_mutex_unlock(&mutex_chardata);
         }
 
-        pthread_mutex_lock(&mutex_test1);
+        //pthread_mutex_lock(&mutex_test1);
         if(verify == true){
         //new lizard character joins
         if(recvm->msg_type == 0){
             //max players
+            pthread_mutex_lock(&mutex_n_chars);
             if(n_chars == MAX_PLAYERS){
                 *(recvm->ch) = 0;
                 packed_size = proto_char_message__get_packed_size(recvm);
@@ -240,10 +246,12 @@ void *lizard_function(void *context){
                 recvm=NULL;
             }else{
             //check if character is already in char_data
-            ch = *(recvm->ch);          
+            ch = *(recvm->ch);        
+            pthread_mutex_lock(&mutex_chardata);  
             ch = available_char(n_chars, ch, char_data);
             *(recvm->ch) = ch;
             strcpy(char_data[n_chars].password, recvm->password);
+            pthread_mutex_unlock(&mutex_chardata);
             packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
             proto_char_message__pack(recvm, packed_buffer);
@@ -254,52 +262,70 @@ void *lizard_function(void *context){
             recvm=NULL;
 
             //find a free space (it can have a cockroach or a lizard body)
+            pthread_mutex_lock(&mutex_board);
             while(1){
                 pos_x = random()%(WINDOW_SIZE-2) + 1;
                 pos_y = random()%(WINDOW_SIZE-2) + 1;
+                
                 if(board[pos_y][pos_x].ch <= 46)
                     break;
+                
             }
-
+            pthread_mutex_unlock(&mutex_board);
+            pthread_mutex_lock(&mutex_chardata);
             char_data[n_chars].ch = ch;
             char_data[n_chars].pos_x = pos_x;
             char_data[n_chars].pos_y = pos_y;
             char_data[n_chars].score = 0;
             char_data[n_chars].win = false;
             char_data[n_chars].lose = false;
+            pthread_mutex_unlock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_board);
             board[pos_y][pos_x].ch = ch;
-
+            pthread_mutex_unlock(&mutex_board);
             //initiate lizard going up
             direction = PROTO_DIRECTION__UP;
+            pthread_mutex_lock(&mutex_chardata);
             char_data[n_chars].dir = PROTO_DIRECTION__UP;
+            pthread_mutex_unlock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_my_win);
             for(i = 1; i <= 5; i++){
-                    if(pos_x + i < WINDOW_SIZE-1){
-                        if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
-                            wmove(my_win, pos_x + i, pos_y);
-                            waddch(my_win, '.'| A_BOLD);
-                            board[pos_y][pos_x + i].ch = '.';
-                            *(m2.ch) = '.';
-                            m2.posx = pos_x + i;
-                            m2.posy = pos_y;
-                            packed_size = proto_display_message__get_packed_size(&m2);
-                            packed_buffer = malloc(packed_size);
-                            proto_display_message__pack(&m2, packed_buffer);
-                            zmq_send (publisher, packed_buffer, packed_size, 0);
-                            free(packed_buffer);
-                            packed_buffer=NULL;
-                        }
-                        board[pos_y][pos_x + i].nlayers++;
-                    }else{
-                        break;
+                if(pos_x + i < WINDOW_SIZE-1){
+                    pthread_mutex_lock(&mutex_board);
+                    if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
+                        //pthread_mutex_lock(&mutex_my_win);
+                        wmove(my_win, pos_x + i, pos_y);
+                        waddch(my_win, '.'| A_BOLD);
+                        //pthread_mutex_unlock(&mutex_my_win);
+                        board[pos_y][pos_x + i].ch = '.';
+                        *(m2.ch) = '.';
+                        m2.posx = pos_x + i;
+                        m2.posy = pos_y;
+                        packed_size = proto_display_message__get_packed_size(&m2);
+                        packed_buffer = malloc(packed_size);
+                        proto_display_message__pack(&m2, packed_buffer);
+                        zmq_send (publisher, packed_buffer, packed_size, 0);
+                        free(packed_buffer);
+                        packed_buffer=NULL;
                     }
+                    board[pos_y][pos_x + i].nlayers++;
+                    pthread_mutex_unlock(&mutex_board);
+                }else{
+                    break;
                 }
+            }
+            pthread_mutex_unlock(&mutex_my_win);
             n_chars++;
 
             /* draw mark on new position */
+            pthread_mutex_lock(&mutex_my_win);
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
+            pthread_mutex_lock(&mutex_chardata);
             scoreboard(char_data, n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             wrefresh(my_win);	
+            pthread_mutex_unlock(&mutex_my_win);
             *(m2.ch) = ch;
             m2.posx = pos_x;
             m2.posy = pos_y;	
@@ -311,16 +337,21 @@ void *lizard_function(void *context){
             packed_buffer=NULL;
 
             }
+            pthread_mutex_unlock(&mutex_n_chars);
         }
         //lizard movement message
         else if(recvm->msg_type == 1){
             //check if current ch_pos is a winner
             bool winner = false;
             bool loser = false;
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             int ch_pos = find_ch_info(char_data, n_chars, *(recvm->ch));
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             int ch_pos2;
             if(ch_pos != -1){
-
+                pthread_mutex_lock(&mutex_chardata);
                 pos_x = char_data[ch_pos].pos_x;
                 pos_y = char_data[ch_pos].pos_y;
                 ch = char_data[ch_pos].ch;
@@ -328,10 +359,15 @@ void *lizard_function(void *context){
                 loser = char_data[ch_pos].lose;
                 //load old direction
                 direction = char_data[ch_pos].dir;
+                pthread_mutex_unlock(&mutex_chardata);
                 /*deletes old place */
+                pthread_mutex_lock(&mutex_board);
                 board[pos_y][pos_x].ch = ' ';
+                pthread_mutex_unlock(&mutex_board);
+                pthread_mutex_lock(&mutex_my_win);
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win,' ');
+                pthread_mutex_unlock(&mutex_my_win);
                 *(m2.ch) = ' ';
                 m2.posx = pos_x;
                 m2.posy = pos_y;	
@@ -343,13 +379,17 @@ void *lizard_function(void *context){
                 packed_buffer=NULL;
                 //remove tail only if not a loser
             if(loser == false){
+            pthread_mutex_lock(&mutex_my_win);
             switch (direction)
             {
             case UP:
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x + i].ch <= 46 && board[pos_y][pos_x + i].ch != 35){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
@@ -418,8 +458,12 @@ void *lizard_function(void *context){
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x + i].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -428,8 +472,11 @@ void *lizard_function(void *context){
             case DOWN:
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x - i].ch <= 46 && board[pos_y][pos_x - i].ch != 35){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
@@ -498,8 +545,12 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x - i].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -508,8 +559,11 @@ void *lizard_function(void *context){
             case LEFT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y + i][pos_x].ch <= 46 && board[pos_y + i][pos_x].ch != 35){  
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
@@ -578,8 +632,12 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y + i][pos_x].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -588,8 +646,11 @@ void *lizard_function(void *context){
             case RIGHT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y - i][pos_x].ch <= 46 && board[pos_y - i][pos_x].ch != 35){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
@@ -658,8 +719,12 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y - i][pos_x].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -668,36 +733,110 @@ void *lizard_function(void *context){
             default:
                 break;
             }
+            pthread_mutex_unlock(&mutex_my_win);
+            }
+            //if it doesn't have a tail
+            else{
+                pthread_mutex_lock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
+                under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, 2, winner);
+                pthread_mutex_unlock(&mutex_cockdata);
+                pthread_mutex_lock(&mutex_my_win);
+                if(under == 0){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, ' ');
+                    board[pos_y][pos_x].ch = ' ';
+                    *(m2.ch)= ' ';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 8){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '*'| A_BOLD);
+                    board[pos_y][pos_x].ch = '*';
+                    *(m2.ch)= '*';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 9){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '.'| A_BOLD);
+                    board[pos_y][pos_x].ch = '.';
+                    *(m2.ch)= '.';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }else{
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, (under + '0')| A_BOLD);
+                    board[pos_y][pos_x].ch = under;
+                    *(m2.ch)= (char)(under + '0');
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }
+                pthread_mutex_unlock(&mutex_my_win);
+                pthread_mutex_unlock(&mutex_board);
             }   
                 /* claculates new direction */
                 direction = recvm->direction;
+                pthread_mutex_lock(&mutex_chardata);
                 char_data[ch_pos].dir = direction;
+                pthread_mutex_unlock(&mutex_chardata);
                 m2.posx = pos_x;
                 m2.posy = pos_y;
                 /* claculates new mark position */
                 new_position(&pos_x, &pos_y, direction);
                 //collision with lizard, don't change position
+                pthread_mutex_lock(&mutex_board);
                 if(board[pos_y][pos_x].ch > 46 && board[pos_y][pos_x].ch != ch){
                     //half of total score
+                    pthread_mutex_lock(&mutex_chardata);
+                    pthread_mutex_lock(&mutex_n_chars);
                     ch_pos2 = find_ch_info(char_data, n_chars, board[pos_y][pos_x].ch);
+                    pthread_mutex_unlock(&mutex_n_chars);
                     total_score = char_data[ch_pos].score + char_data[ch_pos2].score;
                     char_data[ch_pos].score = total_score/2;
                     char_data[ch_pos2].score = total_score/2;
                     bumped_direction = char_data[ch_pos2].dir;
-
+                    
                     //if the bumped lizard was not a loser and now it is
                     if(char_data[ch_pos2].score < 0 && char_data[ch_pos2].lose == false){
                         char_data[ch_pos2].win = false;
                         char_data[ch_pos2].lose = true;
                         //TODO: apagar a cauda do outro (ch_pos2) lizard
                         //delete from board
+                        pthread_mutex_lock(&mutex_my_win);
             switch (bumped_direction)
             {
             case UP:
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
                         if(board[pos_y][pos_x + i].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
@@ -781,7 +920,9 @@ void *lizard_function(void *context){
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
                         if(board[pos_y][pos_x - i].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
@@ -864,7 +1005,9 @@ void *lizard_function(void *context){
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
                         if(board[pos_y + i][pos_x].ch <= 46){  
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
@@ -949,7 +1092,9 @@ void *lizard_function(void *context){
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
                         if(board[pos_y - i][pos_x].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
@@ -1034,6 +1179,7 @@ void *lizard_function(void *context){
                 break;
             }
             
+                    pthread_mutex_unlock(&mutex_my_win);
                     }
                     //if bumped lizard is now a winner and wasn't a loser
                     else if(char_data[ch_pos2].score >= 50 && char_data[ch_pos2].lose == false){
@@ -1048,8 +1194,9 @@ void *lizard_function(void *context){
                         char_data[ch_pos].win = false;
                         char_data[ch_pos].lose = true;
                     }
-
+                    pthread_mutex_unlock(&mutex_chardata);
                 }else if(board[pos_y][pos_x].ch == 35){ //bumped a wasp
+                    pthread_mutex_lock(&mutex_chardata);
                     //reduce score by 10
                     char_data[ch_pos].score = char_data[ch_pos].score - 10;
 
@@ -1061,11 +1208,15 @@ void *lizard_function(void *context){
                     //don't change position
                     pos_x = char_data[ch_pos].pos_x;
                     pos_y = char_data[ch_pos].pos_y;
+                    pthread_mutex_unlock(&mutex_chardata);                
 
                 }else{//can move
+                    pthread_mutex_lock(&mutex_chardata);
                     char_data[ch_pos].pos_x = pos_x;
                     char_data[ch_pos].pos_y = pos_y;
                     //check if any cockroach in the new position and score
+                    pthread_mutex_lock(&mutex_cockdata);
+                    pthread_mutex_lock(&mutex_total_cock);
                     for(i = 0; i < total_cock; i++){
                         if(cock_data[i].posx == pos_x && cock_data[i].posy == pos_y && (time(&start_time)-cock_data[i].time_eaten)>=5){
                             char_data[ch_pos].score += cock_data[i].value;
@@ -1074,13 +1225,19 @@ void *lizard_function(void *context){
                             cock_data[i].posy = random()%(WINDOW_SIZE-2) + 1;
                         }
                     }
+                    pthread_mutex_unlock(&mutex_total_cock);
+                    pthread_mutex_unlock(&mutex_cockdata);
+                    pthread_mutex_unlock(&mutex_chardata);
                 }
+                pthread_mutex_unlock(&mutex_board);
                 //winning
+                pthread_mutex_lock(&mutex_chardata);
                 if(char_data[ch_pos].score >= 50 && char_data[ch_pos].lose == false)
                     char_data[ch_pos].win = true;
-
+                
                 //send score back to lizard
                 recvm->ncock = char_data[ch_pos].score;
+                pthread_mutex_unlock(&mutex_chardata);
                 packed_size = proto_char_message__get_packed_size(recvm);
                 packed_buffer = malloc(packed_size);
                 proto_char_message__pack(recvm, packed_buffer);
@@ -1092,13 +1249,16 @@ void *lizard_function(void *context){
 
 
             }
-            //draw lizard tail
+            //draw lizard tail if not loser
+            pthread_mutex_lock(&mutex_chardata);
             if(char_data[ch_pos].lose == false){
+            pthread_mutex_lock(&mutex_my_win);
             switch (direction)
             {
             case UP:
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x + i].ch <= 32){
                             wmove(my_win, pos_x + i, pos_y);
                             if(char_data[ch_pos].win == true){
@@ -1122,6 +1282,8 @@ void *lizard_function(void *context){
                         board[pos_y][pos_x + i].nlayers++;
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x + i].wlayers++;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1130,6 +1292,7 @@ void *lizard_function(void *context){
             case DOWN:
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x - i].ch <= 32){
                             wmove(my_win, pos_x - i, pos_y);
                             if(char_data[ch_pos].win == true){
@@ -1153,6 +1316,8 @@ void *lizard_function(void *context){
                         board[pos_y][pos_x - i].nlayers++;
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x - i].wlayers++;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1161,6 +1326,7 @@ void *lizard_function(void *context){
             case LEFT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y + i][pos_x].ch <= 32){    
                             wmove(my_win, pos_x, pos_y + i);
                             if(char_data[ch_pos].win == true){
@@ -1184,6 +1350,8 @@ void *lizard_function(void *context){
                         board[pos_y + i][pos_x].nlayers++;
                         if(char_data[ch_pos].win == true)
                             board[pos_y + i][pos_x].wlayers++;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1192,6 +1360,7 @@ void *lizard_function(void *context){
             case RIGHT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y - i][pos_x].ch <= 32){
                             wmove(my_win, pos_x, pos_y - i);
                             if(char_data[ch_pos].win == true){
@@ -1215,6 +1384,8 @@ void *lizard_function(void *context){
                         board[pos_y - i][pos_x].nlayers++;    
                         if(char_data[ch_pos].win == true)
                             board[pos_y - i][pos_x].wlayers++;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1223,22 +1394,33 @@ void *lizard_function(void *context){
             default:
                 break;
             }
+            pthread_mutex_unlock(&mutex_my_win);
             }
+            pthread_mutex_unlock(&mutex_chardata);
             /* draw mark on new position */
+            pthread_mutex_lock(&mutex_board);
             board[pos_y][pos_x].ch = ch;
+            pthread_mutex_unlock(&mutex_board);
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             scoreboard(char_data, n_chars);
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             //send scoreboard
             m2.posx = 999; //flag for scoreboard
+            pthread_mutex_lock(&mutex_n_chars);
             m2.posy = n_chars; //send number of characters
+            pthread_mutex_unlock(&mutex_n_chars);
             packed_size = proto_display_message__get_packed_size(&m2);
             packed_buffer = malloc(packed_size);
             proto_display_message__pack(&m2, packed_buffer);
             zmq_send (publisher, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             for(i = 0; i < n_chars; i++){
                 m2.posx = char_data[i].ch;
-                //*(m2.ch)= (char)(char_data[i].ch + '0');
                 m2.score = char_data[i].score;
                 packed_size = proto_display_message__get_packed_size(&m2);
                 packed_buffer = malloc(packed_size);
@@ -1247,11 +1429,15 @@ void *lizard_function(void *context){
                 free(packed_buffer);
                 packed_buffer=NULL;
             }
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             refresh();
+            pthread_mutex_lock(&mutex_my_win);
             box(my_win, 0 , 0);
             wmove(my_win, pos_x, pos_y);
             waddch(my_win, ch| A_BOLD);
             wrefresh(my_win);	
+            pthread_mutex_unlock(&mutex_my_win);
             *(m2.ch) = ch;		
             m2.posx = pos_x;
             m2.posy = pos_y;
@@ -1266,8 +1452,9 @@ void *lizard_function(void *context){
         //remote display joins
         else if(recvm->msg_type == 2){
             //send the board with the printed chars
+            pthread_mutex_lock(&mutex_board);
             zmq_send (responder, &board, sizeof(board), 0); //Probably a new board needs to be created in protobuf.
-
+            pthread_mutex_unlock(&mutex_board);
         }
         //lizard disconnect
         else if(recvm->msg_type == 5){
@@ -1277,20 +1464,27 @@ void *lizard_function(void *context){
             zmq_send (responder, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
-            
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             int ch_pos = find_ch_info(char_data, n_chars, *(recvm->ch));
-            
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             proto_char_message__free_unpacked(recvm, NULL);
             recvm=NULL;
-            
+            pthread_mutex_lock(&mutex_chardata);
             bool winner = char_data[ch_pos].win;
             pos_x = char_data[ch_pos].pos_x;
             pos_y = char_data[ch_pos].pos_y;
             ch = char_data[ch_pos].ch;
             direction = char_data[ch_pos].dir;
+            pthread_mutex_unlock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_board);
             board[pos_y][pos_x].ch = ' ';
+            pthread_mutex_unlock(&mutex_board);
+            pthread_mutex_lock(&mutex_my_win);
             wmove(my_win, pos_x, pos_y);
             waddch(my_win,' ');
+            pthread_mutex_unlock(&mutex_my_win);
             *(m2.ch)= ' ';
             m2.posx = pos_x;
             m2.posy = pos_y;		
@@ -1300,14 +1494,18 @@ void *lizard_function(void *context){
             zmq_send (publisher, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
-            //delete from board
+            //delete tailfrom board
+            pthread_mutex_lock(&mutex_my_win);
             switch (direction)
             {
             case UP:
                 for(i = 1; i <= 5; i++){
                     if(pos_x + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x + i].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x + i], pos_x + i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x + i, pos_y);
                                 waddch(my_win, ' ');
@@ -1380,8 +1578,11 @@ void *lizard_function(void *context){
                             }
                         }    
                         board[pos_y][pos_x + i].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x + i].wlayers--;
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1390,8 +1591,11 @@ void *lizard_function(void *context){
             case DOWN:
                 for(i = 1; i <= 5; i++){
                     if(pos_x - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x - i].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x - i], pos_x - i, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x - i, pos_y);
                                 waddch(my_win, ' ');
@@ -1463,8 +1667,11 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y][pos_x - i].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x - i].wlayers--;
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1473,8 +1680,11 @@ void *lizard_function(void *context){
             case LEFT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y + i < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y + i][pos_x].ch <= 46){  
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y + i][pos_x], pos_x, pos_y + i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i);
                                 waddch(my_win, ' ');
@@ -1548,8 +1758,11 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y + i][pos_x].nlayers--;
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y + i][pos_x].wlayers--;
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1558,8 +1771,11 @@ void *lizard_function(void *context){
             case RIGHT:
                 for(i = 1; i <= 5; i++){
                     if(pos_y - i > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y - i][pos_x].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y - i][pos_x], pos_x, pos_y - i, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i);
                                 waddch(my_win, ' ');
@@ -1633,8 +1849,11 @@ void *lizard_function(void *context){
                             }
                         }
                         board[pos_y - i][pos_x].nlayers--;    
+                        pthread_mutex_lock(&mutex_chardata);
                         if(char_data[ch_pos].win == true)
                             board[pos_y - i][pos_x].wlayers--;
+                        pthread_mutex_unlock(&mutex_chardata);
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -1644,7 +1863,72 @@ void *lizard_function(void *context){
                 break;
             }
             
+            pthread_mutex_unlock(&mutex_my_win);
+            //delete head from board
+            pthread_mutex_lock(&mutex_board);
+            pthread_mutex_lock(&mutex_cockdata);
+            under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, 2, winner);
+            pthread_mutex_unlock(&mutex_cockdata);
+            pthread_mutex_lock(&mutex_my_win);
+                if(under == 0){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, ' ');
+                    board[pos_y][pos_x].ch = ' ';
+                    *(m2.ch)= ' ';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 8){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '*'| A_BOLD);
+                    board[pos_y][pos_x].ch = '*';
+                    *(m2.ch)= '*';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 9){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '.'| A_BOLD);
+                    board[pos_y][pos_x].ch = '.';
+                    *(m2.ch)= '.';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }else{
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, (under + '0')| A_BOLD);
+                    board[pos_y][pos_x].ch = under;
+                    *(m2.ch)= (char)(under + '0');
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }
+            pthread_mutex_unlock(&mutex_my_win);
+            pthread_mutex_unlock(&mutex_board);
             //remove from char_data, reduce the index of every lizard that comes after it
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             for(i = ch_pos; i <= (n_chars-1); i++){
                 char_data[i].ch = char_data[i+1].ch;
                 char_data[i].pos_x = char_data[i+1].pos_x;
@@ -1659,16 +1943,21 @@ void *lizard_function(void *context){
             }
             n_chars--;
             scoreboard(char_data, n_chars);
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             //send scoreboard
             m2.posx = 999; //flag for scoreboard
+            pthread_mutex_lock(&mutex_n_chars);
             m2.posy = n_chars; //send number of characters
+            pthread_mutex_unlock(&mutex_n_chars);
             packed_size = proto_display_message__get_packed_size(&m2);
             packed_buffer = malloc(packed_size);
             proto_display_message__pack(&m2, packed_buffer);
             zmq_send (publisher, packed_buffer, packed_size, 0);
             free(packed_buffer);
             packed_buffer=NULL;
-
+            pthread_mutex_lock(&mutex_chardata);
+            pthread_mutex_lock(&mutex_n_chars);
             for(i = 0; i < n_chars; i++){
                 m2.posx = char_data[i].ch;
                 //*(m2.ch)= (char)(char_data[i].ch + '0');
@@ -1680,12 +1969,16 @@ void *lizard_function(void *context){
                 free(packed_buffer);
                 packed_buffer=NULL;
             }
+            pthread_mutex_unlock(&mutex_n_chars);
+            pthread_mutex_unlock(&mutex_chardata);
             refresh();
+            pthread_mutex_lock(&mutex_my_win);
             box(my_win, 0 , 0);
             wrefresh(my_win);
+            pthread_mutex_unlock(&mutex_my_win);
         }
         }
-        pthread_mutex_unlock(&mutex_test1);
+        //pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
 
@@ -1724,6 +2017,7 @@ void *roach_function(void *context){
 
         if(recvm->msg_type == 4 || recvm->msg_type == 7 || recvm->msg_type == 8 || recvm->msg_type == 9){
             verify=false;
+            pthread_mutex_lock(&mutex_cockdata);
             for(i = *(recvm->ch); i < *(recvm->ch) + (recvm->ncock); i++){
                 if(strcmp(cock_data[i].password, recvm->password) != 0){
                     verify = false;
@@ -1733,15 +2027,17 @@ void *roach_function(void *context){
                     break;
                 }else{verify = true;}
             }
+            pthread_mutex_unlock(&mutex_cockdata);
         }
 
-        pthread_mutex_lock(&mutex_test1);
+        //pthread_mutex_lock(&mutex_test1);
         if(verify == true){
         //cockroach joins
         if(recvm->msg_type == 3){
             //number of cockroaches from this user
             ncock = recvm->ncock;
             //check if there is no more space for cockroaches
+            pthread_mutex_lock(&mutex_total_cock);
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
                 recvm->ncock = 0;
@@ -1760,17 +2056,22 @@ void *roach_function(void *context){
                     k = random()%(WINDOW_SIZE-2) + 1;
                     l = random()%(WINDOW_SIZE-2) + 1;
                     //if it is a free space, a lizard body or another cockroach
+                    pthread_mutex_lock(&mutex_board);
                     if(board[l][k].ch <= 46 && board[l][k].ch != 35){
                         //save the cockroach data
                         ch = random()%5 + 1;
+                        pthread_mutex_lock(&mutex_cockdata);
                         cock_data[total_cock + i].value = ch;
                         cock_data[total_cock + i].posx = k;
                         cock_data[total_cock + i].posy = l;
                         board[l][k].ch = ch;
                         strcpy(cock_data[total_cock + i].password, recvm->password);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         //print the cockroach
+                        pthread_mutex_lock(&mutex_my_win);
                         wmove(my_win, k, l);
                         waddch(my_win, (ch + '0')| A_BOLD);
+                        pthread_mutex_unlock(&mutex_my_win);
                         //send to displays
                         *(m2.ch)= (char)(ch + '0');
                         m2.posx = k;
@@ -1783,8 +2084,11 @@ void *roach_function(void *context){
                         packed_buffer=NULL;
                         i++;
                     }
+                    pthread_mutex_unlock(&mutex_board);
                 }
+                pthread_mutex_lock(&mutex_my_win);
                 wrefresh(my_win);
+                pthread_mutex_unlock(&mutex_my_win);
                 //send the position of the first cockroach in the data array
                 *(recvm->ch) = total_cock;
                 packed_size = proto_char_message__get_packed_size(recvm);
@@ -1797,6 +2101,7 @@ void *roach_function(void *context){
                 recvm=NULL;
                 total_cock = total_cock + ncock;
             }
+            pthread_mutex_unlock(&mutex_total_cock);
         }
         //cockroach movement
         else if(recvm->msg_type == 4){
@@ -1805,11 +2110,14 @@ void *roach_function(void *context){
             bool winner = false;
             for(i = 0; i < ncock; i++){
                 //load previous data
+                pthread_mutex_lock(&mutex_cockdata);
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
                 ch = cock_data[fcock + i].value;
                 direction = recvm->cockdir[i];
             if((time(&start_time)-cock_data[fcock + i].time_eaten)>=5){
+                pthread_mutex_lock(&mutex_board);
+                pthread_mutex_lock(&mutex_my_win);
                 switch (direction)
                 {
                 case UP:
@@ -2064,14 +2372,18 @@ void *roach_function(void *context){
                 default:
                     break;
                 }
-            
+                
+                pthread_mutex_unlock(&mutex_my_win);
                 //saves data in new position
                 board[pos_y][pos_x].ch = ch;
+                pthread_mutex_unlock(&mutex_board);
                 cock_data[fcock +i].posx = pos_x;
                 cock_data[fcock +i].posy = pos_y;
                 //print new position
+                pthread_mutex_lock(&mutex_my_win);
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win, (ch + '0')| A_BOLD);
+                pthread_mutex_unlock(&mutex_my_win);
                 *(m2.ch)= (char)(ch + '0');
                 m2.posx = pos_x;
                 m2.posy = pos_y;		
@@ -2083,8 +2395,11 @@ void *roach_function(void *context){
                 packed_buffer=NULL;
 
             }
+            pthread_mutex_unlock(&mutex_cockdata);
             }
+            pthread_mutex_lock(&mutex_my_win);
             wrefresh(my_win);
+            pthread_mutex_unlock(&mutex_my_win);
             packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
             proto_char_message__pack(recvm, packed_buffer);
@@ -2100,6 +2415,7 @@ void *roach_function(void *context){
             ncock = recvm->ncock;
             printf("%d", ncock);
             //check if there is no more space for wasps
+            pthread_mutex_lock(&mutex_total_cock);
             if(total_cock + ncock > MAX_COCK){
                 //"too many insects" and close the client
                 recvm->ncock = 0;
@@ -2119,16 +2435,21 @@ void *roach_function(void *context){
                     k = random()%(WINDOW_SIZE-2) + 1;
                     l = random()%(WINDOW_SIZE-2) + 1;
                     //if it is a free spaceor a lizard body
+                    pthread_mutex_lock(&mutex_board);
                     if((board[l][k].ch == 32) || (board[l][k].ch == 42) || (board[l][k].ch == 46)){
                         //save the wasp data
+                        pthread_mutex_lock(&mutex_cockdata);
                         cock_data[total_cock + i].value = '#';
                         cock_data[total_cock + i].posx = k;
                         cock_data[total_cock + i].posy = l;
                         board[l][k].ch = '#';
                         strcpy(cock_data[total_cock + i].password, recvm->password);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         //print the wasp
+                        pthread_mutex_lock(&mutex_my_win);
                         wmove(my_win, k, l);
                         waddch(my_win, '#'| A_BOLD);
+                        pthread_mutex_unlock(&mutex_my_win);
                         //send to displays
                         *(m2.ch)= '#';
                         m2.posx = k;
@@ -2141,8 +2462,11 @@ void *roach_function(void *context){
                         packed_buffer=NULL;
                         i++;
                     }
+                    pthread_mutex_unlock(&mutex_board);
                 }
+                pthread_mutex_lock(&mutex_my_win);
                 wrefresh(my_win);
+                pthread_mutex_unlock(&mutex_my_win);
                 //send the position of the first cockroach in the data array
                 *(recvm->ch) = total_cock;
                 packed_size = proto_char_message__get_packed_size(recvm);
@@ -2156,6 +2480,7 @@ void *roach_function(void *context){
                 //update the number of cockroaches in the server
                 total_cock = total_cock + ncock;
             }
+            pthread_mutex_unlock(&mutex_total_cock);
         }
         //wasp movement
         else if(recvm->msg_type == 7){
@@ -2169,13 +2494,16 @@ void *roach_function(void *context){
                 bumped = false;
                 loser = false;
                 //load previous data
+                pthread_mutex_lock(&mutex_cockdata);
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
+                pthread_mutex_unlock(&mutex_cockdata);
                 save_x = pos_x;
                 save_y = pos_y;
                 ch = '#';
                 direction = recvm->cockdir[i];
-
+                pthread_mutex_lock(&mutex_board);
+                pthread_mutex_lock(&mutex_my_win);
                 switch (direction)
                 {
                 case UP:
@@ -2183,7 +2511,9 @@ void *roach_function(void *context){
                     if(pos_x - 1 > 0 && board[pos_y][pos_x - 1].ch != 35 && board[pos_y][pos_x - 1].ch >= 32){
                         //check if lizard head
                         if(board[pos_y][pos_x - 1].ch <= 46){
+                        pthread_mutex_lock(&mutex_cockdata);
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
@@ -2244,7 +2574,10 @@ void *roach_function(void *context){
                         }
                         //bumped lizard head
                         else{
+                            pthread_mutex_lock(&mutex_chardata);
+                            pthread_mutex_lock(&mutex_n_chars);
                             ch_pos = find_ch_info(char_data, n_chars, board[pos_y][pos_x - 1].ch);
+                            pthread_mutex_unlock(&mutex_n_chars);
                             char_data[ch_pos].score = char_data[ch_pos].score - 10;
                             bumped = true;
                             loser = char_data[ch_pos].lose;
@@ -2254,13 +2587,16 @@ void *roach_function(void *context){
                             }
                             pos_x = char_data[ch_pos].pos_x;
                             pos_y = char_data[ch_pos].pos_y;
+                            pthread_mutex_unlock(&mutex_chardata);
                         }
                     }
                     break;
                 case DOWN:
                     if(pos_x + 1 < WINDOW_SIZE-1 && board[pos_y][pos_x + 1].ch != 35 && board[pos_y][pos_x + 1].ch >= 32){
                         if(board[pos_y][pos_x + 1].ch <= 46){
+                        pthread_mutex_lock(&mutex_cockdata);
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
@@ -2320,7 +2656,10 @@ void *roach_function(void *context){
                         }
                         pos_x++;
                         } else{
+                            pthread_mutex_lock(&mutex_chardata);
+                            pthread_mutex_lock(&mutex_n_chars);
                             ch_pos = find_ch_info(char_data, n_chars, board[pos_y][pos_x + 1].ch);
+                            pthread_mutex_unlock(&mutex_n_chars);
                             char_data[ch_pos].score = char_data[ch_pos].score - 10;
                             bumped = true;
                             loser = char_data[ch_pos].lose;
@@ -2331,13 +2670,16 @@ void *roach_function(void *context){
                             
                             pos_x = char_data[ch_pos].pos_x;
                             pos_y = char_data[ch_pos].pos_y;
+                            pthread_mutex_unlock(&mutex_chardata);
                         }
                     }
                     break;
                 case LEFT:
                     if(pos_y - 1 > 0 && board[pos_y - 1][pos_x].ch != 35 && board[pos_y - 1][pos_x].ch >= 32){
                         if(board[pos_y - 1][pos_x].ch <= 46){
+                        pthread_mutex_lock(&mutex_cockdata);
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
@@ -2396,7 +2738,10 @@ void *roach_function(void *context){
                         }
                         pos_y--;
                         } else{
+                            pthread_mutex_lock(&mutex_chardata);
+                            pthread_mutex_lock(&mutex_n_chars);
                             ch_pos = find_ch_info(char_data, n_chars, board[pos_y - 1][pos_x].ch);
+                            pthread_mutex_unlock(&mutex_n_chars);
                             char_data[ch_pos].score = char_data[ch_pos].score - 10;
                             bumped = true;
                             loser = char_data[ch_pos].lose;
@@ -2406,13 +2751,16 @@ void *roach_function(void *context){
                             }
                             pos_x = char_data[ch_pos].pos_x;
                             pos_y = char_data[ch_pos].pos_y;
+                            pthread_mutex_unlock(&mutex_chardata);
                         }
                     }
                     break;
                 case RIGHT:
                     if(pos_y + 1 < WINDOW_SIZE-1 && board[pos_y + 1][pos_x].ch != 35 && board[pos_y + 1][pos_x].ch >= 32){
                         if(board[pos_y + 1][pos_x].ch <= 46){
+                        pthread_mutex_lock(&mutex_cockdata);
                         under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                        pthread_mutex_unlock(&mutex_cockdata);
                         if(under == 0 || under == 7){
                             wmove(my_win, pos_x, pos_y);
                             waddch(my_win, ' ');
@@ -2471,7 +2819,10 @@ void *roach_function(void *context){
                         }
                         pos_y++;
                         } else{
+                            pthread_mutex_lock(&mutex_chardata);
+                            pthread_mutex_lock(&mutex_n_chars);
                             ch_pos = find_ch_info(char_data, n_chars, board[pos_y + 1][pos_x].ch);
+                            pthread_mutex_unlock(&mutex_n_chars);
                             char_data[ch_pos].score = char_data[ch_pos].score - 10;
                             bumped = true;
                             loser = char_data[ch_pos].lose;
@@ -2481,23 +2832,31 @@ void *roach_function(void *context){
                             }
                             pos_x = char_data[ch_pos].pos_x;
                             pos_y = char_data[ch_pos].pos_y;
+                            pthread_mutex_unlock(&mutex_chardata);
                         }
                     }
                     break;
                 default:
                     break;
                 }
-            
+                pthread_mutex_unlock(&mutex_my_win);
+                pthread_mutex_unlock(&mutex_board);
+
                 //deletes the lizard tail if it bumped and score changed to negative
+                pthread_mutex_lock(&mutex_chardata);
                 if (bumped == true && char_data[ch_pos].score < 0 && loser ==  false){
                     //delete from board
+                    pthread_mutex_lock(&mutex_my_win);
             switch (char_data[ch_pos].dir)
             {
             case UP:
                 for(int i2 = 1; i2 <= 5; i2++){
                     if(pos_x + i2 < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x + i2].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x + i2], pos_x + i2, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x + i2, pos_y);
                                 waddch(my_win, ' ');
@@ -2572,6 +2931,8 @@ void *roach_function(void *context){
                         board[pos_y][pos_x + i2].nlayers--;
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x + i2].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -2580,8 +2941,11 @@ void *roach_function(void *context){
             case DOWN:
                 for(int i2 = 1; i2 <= 5; i2++){
                     if(pos_x - i2 > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y][pos_x - i2].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y][pos_x - i2], pos_x - i2, pos_y, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x - i2, pos_y);
                                 waddch(my_win, ' ');
@@ -2655,6 +3019,8 @@ void *roach_function(void *context){
                         board[pos_y][pos_x - i2].nlayers--;
                         if(char_data[ch_pos].win == true)
                             board[pos_y][pos_x - i2].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -2663,8 +3029,11 @@ void *roach_function(void *context){
             case LEFT:
                 for(int i2 = 1; i2 <= 5; i2++){
                     if(pos_y + i2 < WINDOW_SIZE-1){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y + i2][pos_x].ch <= 46){  
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y + i2][pos_x], pos_x, pos_y + i2, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y + i2);
                                 waddch(my_win, ' ');
@@ -2740,6 +3109,8 @@ void *roach_function(void *context){
                         board[pos_y + i2][pos_x].nlayers--;
                         if(char_data[ch_pos].win == true)
                             board[pos_y + i2][pos_x].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -2748,8 +3119,11 @@ void *roach_function(void *context){
             case RIGHT:
                 for(int i2 = 1; i2 <= 5; i2++){
                     if(pos_y - i2 > 0){
+                        pthread_mutex_lock(&mutex_board);
                         if(board[pos_y - i2][pos_x].ch <= 46){
+                            pthread_mutex_lock(&mutex_cockdata);
                             under = what_under(board[pos_y - i2][pos_x], pos_x, pos_y - i2, cock_data, -1, winner);
+                            pthread_mutex_unlock(&mutex_cockdata);
                             if(under == 0){
                                 wmove(my_win, pos_x, pos_y - i2);
                                 waddch(my_win, ' ');
@@ -2825,6 +3199,8 @@ void *roach_function(void *context){
                         board[pos_y - i2][pos_x].nlayers--;    
                         if(char_data[ch_pos].win == true)
                             board[pos_y - i2][pos_x].wlayers--;
+
+                        pthread_mutex_unlock(&mutex_board);
                     }else{
                         break;
                     }
@@ -2833,29 +3209,42 @@ void *roach_function(void *context){
             default:
                 break;
             }
-            
+
+                    pthread_mutex_unlock(&mutex_my_win);
                     pos_x = save_x;
                     pos_y = save_y;
                 }else if(bumped == true){
                     pos_x = save_x;
                     pos_y = save_y;
                 }
+                pthread_mutex_unlock(&mutex_chardata);
                 
                 //saves data in new position
+                pthread_mutex_lock(&mutex_board);
                 board[pos_y][pos_x].ch = ch;
+                pthread_mutex_unlock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
                 cock_data[fcock +i].posx = pos_x;
                 cock_data[fcock +i].posy = pos_y;
+                pthread_mutex_unlock(&mutex_cockdata);
+                pthread_mutex_lock(&mutex_chardata);
+                pthread_mutex_lock(&mutex_n_chars);
                 scoreboard(char_data, n_chars);
+                pthread_mutex_unlock(&mutex_n_chars);
+                pthread_mutex_unlock(&mutex_chardata);
                 //send scoreboard
                 m2.posx = 999; //flag for scoreboard
+                pthread_mutex_lock(&mutex_n_chars);
                 m2.posy = n_chars; //send number of characters
+                pthread_mutex_unlock(&mutex_n_chars);
                 packed_size = proto_display_message__get_packed_size(&m2);
                 packed_buffer = malloc(packed_size);
                 proto_display_message__pack(&m2, packed_buffer);
                 zmq_send (publisher, packed_buffer, packed_size, 0);
                 free(packed_buffer);
                 packed_buffer=NULL;
-
+                pthread_mutex_lock(&mutex_chardata);
+                pthread_mutex_lock(&mutex_n_chars);
                 for(int j = 0; j < n_chars; j++){
                     m2.posx = char_data[j].ch;
                     //*(m2.ch)= (char)(char_data[i].ch + '0');
@@ -2867,11 +3256,15 @@ void *roach_function(void *context){
                     free(packed_buffer);
                     packed_buffer=NULL;
                 }
+                pthread_mutex_unlock(&mutex_n_chars);
+                pthread_mutex_unlock(&mutex_chardata);
                 refresh();
                 //print new position
+                pthread_mutex_lock(&mutex_my_win);
                 box(my_win, 0 , 0);
                 wmove(my_win, pos_x, pos_y);
                 waddch(my_win, ch | A_BOLD);
+                pthread_mutex_unlock(&mutex_my_win);
                 *(m2.ch)= ch;
                 m2.posx = pos_x;
                 m2.posy = pos_y;		
@@ -2883,7 +3276,9 @@ void *roach_function(void *context){
                 packed_buffer=NULL;
 
             }
+            pthread_mutex_lock(&mutex_my_win);
             wrefresh(my_win);
+            pthread_mutex_unlock(&mutex_my_win);
             packed_size = proto_char_message__get_packed_size(recvm);
             packed_buffer = malloc(packed_size);
             proto_char_message__pack(recvm, packed_buffer);
@@ -2909,12 +3304,17 @@ void *roach_function(void *context){
             for(i = 0; i < ncock; i++){
 
                 //load current position and value of each roach
+                pthread_mutex_lock(&mutex_cockdata);
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
                 ch = cock_data[fcock + i].value;
-
+                pthread_mutex_unlock(&mutex_cockdata);
                 //find what's under the roach
+                pthread_mutex_lock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
                 under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
+                pthread_mutex_unlock(&mutex_cockdata);
+                pthread_mutex_lock(&mutex_my_win);
                 if(under == 0){
                     wmove(my_win, pos_x, pos_y);
                     waddch(my_win, ' ');
@@ -2969,12 +3369,17 @@ void *roach_function(void *context){
                     free(packed_buffer);
                     packed_buffer=NULL;
                 }
-
+                pthread_mutex_unlock(&mutex_my_win);
+                pthread_mutex_unlock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
                 cock_data[fcock + i].posx = -1;
                 cock_data[fcock + i].posy = -1;
                 cock_data[fcock + i].value = 0;
+                pthread_mutex_unlock(&mutex_cockdata);
             }
+            pthread_mutex_lock(&mutex_my_win);
             wrefresh(my_win);
+            pthread_mutex_unlock(&mutex_my_win);
 
         }       
         //wasp disconnect
@@ -2993,12 +3398,18 @@ void *roach_function(void *context){
             for(i = 0; i < ncock; i++){
 
                 //load current position and value of each roach
+                pthread_mutex_lock(&mutex_cockdata);
                 pos_x = cock_data[fcock + i].posx;
                 pos_y = cock_data[fcock + i].posy;
                 ch = cock_data[fcock + i].value;
+                pthread_mutex_unlock(&mutex_cockdata);
 
                 //find what's under the roach
+                pthread_mutex_lock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
                 under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                pthread_mutex_unlock(&mutex_cockdata);
+                pthread_mutex_lock(&mutex_my_win);
                 if(under == 0 || under == 7){
                     wmove(my_win, pos_x, pos_y);
                     waddch(my_win, ' ');
@@ -3055,16 +3466,21 @@ void *roach_function(void *context){
                     packed_buffer=NULL;
 
                 }
-
+                pthread_mutex_unlock(&mutex_my_win);
+                pthread_mutex_unlock(&mutex_board);
+                pthread_mutex_lock(&mutex_cockdata);
                 cock_data[fcock + i].posx = -1;
                 cock_data[fcock + i].posy = -1;
                 cock_data[fcock + i].value = 0;
+                pthread_mutex_unlock(&mutex_cockdata);
             }
+            pthread_mutex_lock(&mutex_my_win);
             wrefresh(my_win);
+            pthread_mutex_unlock(&mutex_my_win);
 
         } 
         }
-        pthread_mutex_unlock(&mutex_test1);
+        //pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
     return 0;
