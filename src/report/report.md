@@ -25,7 +25,7 @@ One hardcoded C structure:
     - Since the lizards do not need to communicate exclusively in protobuffer Messages a C structure is sent hardcoded through the ZMQ-REP server socket after the lizard client regists its display in the server so that the lizard's display can be initialized with the current state of the game.
     - A containerized version of the struct could have been done in protobuffer, but we opted to not change this as it was not required.
     
-## Implemented 
+## Implemented Functionalities 
 
 ### General/Meta
 

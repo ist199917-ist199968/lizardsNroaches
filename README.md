@@ -18,12 +18,17 @@ average of their scores.
 - If a lizard eats a cockroach, its score increases by the value of the ingested
 cockroach
 
+- If a lizard is stung by a wasp, its score decreases by 10 points.
+
 Although lizards have a long body, the previous interactions only affect the head of the
 lizard
 
 A lizard wins the game when it reachs 50 points, after that he gets to wear a beautiful * mantle for the rest of the game.
 
+A lizard loses the game when its score goes negative, and it loses its body.
+
 After being eaten a cockroach respawns after a 5 second interval.
+
 
 ## Extra-features
 
@@ -51,11 +56,15 @@ The game binaries can be found in the approprietly named `./bin` directory, afte
 bin
 ├── clients
 │   ├── cockroach
+│   │   ├── python
+│   │   │   ├── message_pb2.py
+│   │   │   ├── message_pb2.pyi
+│   │   │   └── roaches-client.py
 │   │   └── roaches-client
-│   └── lizard
-│       └── lizard-client
-├── remote-display
-│   └── display-app
+│   ├── lizard
+│   │   └── lizard-client
+│   └── wasp
+│       └── wasp-client
 └── server
     └── server
 ```
@@ -65,22 +74,33 @@ bin
 ### Server
 
 ```zsh
-./server my_ip my_REQ/REP-port my_PUB/SUB-port
+./server my_ip my_REQ/REP-port_Lizard my_REQ/REP-port_RoachesORWasps my_PUB/SUB-port
 ```
 
 ### Lizard
 
 ```zsh
-./lizard-client server_ip server_REQ/REP-port
+./lizard-client server_ip server_REQ/REP-port_Lizard server_PUB/SUB-port
+
 ```
 
-### Roach 
+### Roaches C
 
 ```zsh
-./roaches-client server_ip server_REQ/REP-port
+./roaches-client server_ip server_REQ/REP-port_RoachesORWasps
+```
+### Roaches Python
+
+```zsh
+python3 roaches-client.py server_ip server_REQ/REP-port_RoachesORWasps
+```
+### Wasp
+
+```zsh
+./wasp-client server_ip server_REQ/REP-port_RoachesORWasps
 ```
 
-### Remote Display app
+### Remote Display app (NOT AVAILABLE IN PART B)
 
 ```zsh
 ./display-app server_ip server_REQ/REP-port server_PUB/SUB-port
