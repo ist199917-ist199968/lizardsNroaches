@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <time.h>
 #include <zmq.h>
 #include <ncurses.h>
 #include "message.pb-c.h"
@@ -12,6 +13,7 @@
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
+#include <time.h>
 
 #define WINDOW_SIZE 30 
 #define MAX_COCK (WINDOW_SIZE*WINDOW_SIZE)/3
@@ -37,7 +39,7 @@ char *candidate1=NULL;
 void *context2 = NULL;
 void *subscriber = NULL;
 board_t board[WINDOW_SIZE-1][WINDOW_SIZE-1];
-int trabalha = 1;
+static bool trabalha = 1;
 
 void sigintHandler(int signum) {
     
@@ -72,6 +74,65 @@ void sigintHandler(int signum) {
     zmq_ctx_destroy (context);
     endwin();			/* End curses mode*/
     exit(signum);  
+}
+
+void inactive() {
+    
+    ProtoCharMessage m;
+    proto_char_message__init(&m); 
+    m.msg_type = 0;
+    m.ch=malloc(sizeof(char));
+    m.password=malloc(50*sizeof(char));
+    m.ch = &ch;
+    m.direction = 0;
+    strcpy(m.password, password);
+    
+    trabalha=false;
+    m.msg_type = 5;
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t *packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
+    ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    proto_char_message__free_unpacked(recvm, NULL);
+    recvm=NULL;
+    while(1){
+    	int key = getch();
+
+        switch (key)
+        {
+        case KEY_LEFT:
+        case KEY_RIGHT:
+        case KEY_DOWN:
+        case KEY_UP:
+            mvprintw(33,0,"You were inactive for too long. \n Press q to exit the program\n");
+            break;
+        
+        case 'q':
+        case 'Q':
+            endwin();
+            free(candidate1);
+            zmq_close (requester);
+            zmq_close(subscriber);
+            zmq_ctx_destroy (context);
+            zmq_ctx_destroy(context2);
+            exit(0);
+            break;
+        
+        default:
+            key = 'x'; 
+            break;
+        }
+
+
+     
+    }
 }
 
 void *display (){
@@ -117,7 +178,7 @@ void *display (){
         packed_size=zmq_recvmsg(subscriber, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         if(trabalha)
-        recvm=proto_display_message__unpack(NULL, packed_size, packed_buffer);
+            recvm=proto_display_message__unpack(NULL, packed_size, packed_buffer);
         
         if(recvm->posx == 999){//flag for scoreboard print
             n_chars = recvm->posy;
@@ -150,8 +211,9 @@ void *display (){
 }
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
+
+    time_t seconds_sinceActive=0;
     signal(SIGINT, sigintHandler); /*log handler*/
     pthread_t threadDisplay;
     srand((unsigned int) time(NULL));
@@ -333,6 +395,7 @@ int main(int argc, char *argv[])
 
         //send the movement message
         if (key != 'x'){
+            seconds_sinceActive=0;
             packed_size = proto_char_message__get_packed_size(&m);
             packed_buffer = malloc(packed_size);
             proto_char_message__pack(&m, packed_buffer);
@@ -346,6 +409,8 @@ int main(int argc, char *argv[])
             recvm=NULL;
             //mvprintw(1,0,"Score - %d", score);
         }
+        if(seconds_sinceActive >=60)
+            inactive();
     }
     free(candidate1);
     zmq_close (requester);
