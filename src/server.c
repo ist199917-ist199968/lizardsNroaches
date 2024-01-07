@@ -70,7 +70,7 @@ int total_cock = 0;
 WINDOW * my_win = NULL;
 void *publisher = NULL;
 char *candidate1;
-int teste = 0;
+//int teste = 0;
 //find what's under; 0 = blank space, 8 = winner body '*'; 9 = lizard body '.'; value = cockroach value; 7 = wasp 
 int what_under(board_t board, int posx, int posy, cockroach_info_t cock_data[MAX_COCK], int cockid, bool is_winner){
     
@@ -183,7 +183,6 @@ void *lizard_function(void *context){
     zmq_connect(responder, "inproc://mydealer1");
     proto_display_message__init(&m2);
     m2.ch=malloc(sizeof(char));
-    //printf("AAA\n");
     while(1){
         
         int ch;
@@ -198,17 +197,14 @@ void *lizard_function(void *context){
         ProtoCharMessage *recvm = NULL;
         zmq_msg_t zmq_msg;
         zmq_msg_init(&zmq_msg);
-
-        pthread_mutex_lock(&lizard_dealer_mutex);
+    
+        //pthread_mutex_lock(&lizard_dealer_mutex);
         packed_size=zmq_recvmsg(responder, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
-        pthread_mutex_unlock(&lizard_dealer_mutex);
+        //pthread_mutex_unlock(&lizard_dealer_mutex);
+
         pthread_mutex_lock(&mutex_test1);
-        mvprintw(WINDOW_SIZE + 2, 0,"ALLO %d", teste);
-        wrefresh(my_win);
-        refresh();
-        teste++;
         //new lizard character joins
         if(recvm->msg_type == 0){
             //max players
@@ -1326,6 +1322,8 @@ void *roach_function(void *context){
         packed_size=zmq_recvmsg(responder, &zmq_msg,0); 
         packed_buffer = zmq_msg_data(&zmq_msg);
         recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+
+        pthread_mutex_lock(&mutex_test1);
         //cockroach joins
         if(recvm->msg_type == 3){
             //number of cockroaches from this user
@@ -2091,6 +2089,11 @@ void *roach_function(void *context){
             recvm=NULL;
         }
 
+        //TODO: disconnect
+        else if(recvm->msg_type == 8){
+            
+        } 
+        pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
 }

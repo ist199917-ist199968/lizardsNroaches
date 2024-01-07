@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <zmq.h>
 #include <ncurses.h>
 #include "message.pb-c.h"
@@ -35,7 +36,7 @@ void sigintHandler(int signum) {
 
 int main(int argc, char *argv[]){	 
     srand((unsigned int) time(NULL));
-
+    signal(SIGINT, sigintHandler);
     if (argc != 3) {
         printf("Wrong number number of arguments\n");
         return 1;
