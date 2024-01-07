@@ -227,7 +227,7 @@ void *lizard_function(void *context){
             pthread_mutex_unlock(&mutex_chardata);
         }
 
-        //pthread_mutex_lock(&mutex_test1);
+        pthread_mutex_lock(&mutex_test1);
         if(verify == true){
         //new lizard character joins
         if(recvm->msg_type == 0){
@@ -1978,7 +1978,7 @@ void *lizard_function(void *context){
             pthread_mutex_unlock(&mutex_my_win);
         }
         }
-        //pthread_mutex_unlock(&mutex_test1);
+        pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
 
@@ -2030,7 +2030,7 @@ void *roach_function(void *context){
             pthread_mutex_unlock(&mutex_cockdata);
         }
 
-        //pthread_mutex_lock(&mutex_test1);
+        pthread_mutex_lock(&mutex_test1);
         if(verify == true){
         //cockroach joins
         if(recvm->msg_type == 3){
@@ -3480,7 +3480,7 @@ void *roach_function(void *context){
 
         } 
         }
-        //pthread_mutex_unlock(&mutex_test1);
+        pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
     return 0;
