@@ -16,7 +16,7 @@ ProtoCharMessage m;
 void *requester;
 
 void sigintHandler(int signum) {
-    m.msg_type=8;
+    m.msg_type=9;
     size_t packed_size = proto_char_message__get_packed_size(&m);
     uint8_t* packed_buffer = malloc(packed_size);
     proto_char_message__pack(&m, packed_buffer);

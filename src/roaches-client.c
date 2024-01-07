@@ -80,7 +80,6 @@ int main(int argc, char *argv[])
 
     // send connection message
     
-    ProtoCharMessage m;
     proto_char_message__init(&m); 
     m.ch=malloc(sizeof(char));
     m.password=malloc(50*sizeof(char));

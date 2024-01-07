@@ -2089,10 +2089,179 @@ void *roach_function(void *context){
             recvm=NULL;
         }
 
-        //TODO: disconnect
+        //cockroach disconnect
         else if(recvm->msg_type == 8){
-            
+            packed_size = proto_char_message__get_packed_size(recvm);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(recvm, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+
+            bool winner = false;
+            ncock = recvm->ncock;
+            fcock = (int) *(recvm->ch);
+
+            for(i = 0; i < ncock; i++){
+
+                //load current position and value of each roach
+                pos_x = cock_data[fcock + i].posx;
+                pos_y = cock_data[fcock + i].posy;
+                ch = cock_data[fcock + i].value;
+
+                //find what's under the roach
+                under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, fcock + i, winner);
+                if(under == 0){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, ' ');
+                    board[pos_y][pos_x].ch = ' ';
+                    *(m2.ch)= ' ';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 8){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '*'| A_BOLD);
+                    board[pos_y][pos_x].ch = '*';
+                    *(m2.ch)= '*';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 9){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '.'| A_BOLD);
+                    board[pos_y][pos_x].ch = '.';
+                    *(m2.ch)= '.';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }else{
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, (under + '0')| A_BOLD);
+                    board[pos_y][pos_x].ch = under;
+                    *(m2.ch)= (char)(under + '0');
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }
+
+                cock_data[fcock + i].posx = -1;
+                cock_data[fcock + i].posy = -1;
+                cock_data[fcock + i].value = 0;
+            }
+            wrefresh(my_win);
+
         } 
+        
+        //wasp disconnect
+        else if(recvm->msg_type == 9){
+            packed_size = proto_char_message__get_packed_size(recvm);
+            packed_buffer = malloc(packed_size);
+            proto_char_message__pack(recvm, packed_buffer);
+            zmq_send (responder, packed_buffer, packed_size, 0);
+            free(packed_buffer);
+            packed_buffer=NULL;
+
+            bool winner = false;
+            ncock = recvm->ncock;
+            fcock = (int) *(recvm->ch);
+
+            for(i = 0; i < ncock; i++){
+
+                //load current position and value of each roach
+                pos_x = cock_data[fcock + i].posx;
+                pos_y = cock_data[fcock + i].posy;
+                ch = cock_data[fcock + i].value;
+
+                //find what's under the roach
+                under = what_under(board[pos_y][pos_x], pos_x, pos_y, cock_data, -2, winner);
+                if(under == 0 || under == 7){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, ' ');
+                    board[pos_y][pos_x].ch = ' ';
+                    *(m2.ch)= ' ';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+                }else if(under == 8){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '*'| A_BOLD);
+                    board[pos_y][pos_x].ch = '*';
+                    *(m2.ch)= '*';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }else if(under == 9){
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, '.'| A_BOLD);
+                    board[pos_y][pos_x].ch = '.';
+                    *(m2.ch)= '.';
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }else{
+                    wmove(my_win, pos_x, pos_y);
+                    waddch(my_win, (under + '0')| A_BOLD);
+                    board[pos_y][pos_x].ch = under;
+                    *(m2.ch)= (char)(under + '0');
+                    m2.posx = pos_x;
+                    m2.posy = pos_y;		
+                    packed_size = proto_display_message__get_packed_size(&m2);
+                    packed_buffer = malloc(packed_size);
+                    proto_display_message__pack(&m2, packed_buffer);
+                    zmq_send (publisher, packed_buffer, packed_size, 0);
+                    free(packed_buffer);
+                    packed_buffer=NULL;
+
+                }
+
+                cock_data[fcock + i].posx = -1;
+                cock_data[fcock + i].posy = -1;
+                cock_data[fcock + i].value = 0;
+            }
+            wrefresh(my_win);
+
+        } 
+        
+        
         pthread_mutex_unlock(&mutex_test1);
         zmq_msg_close(&zmq_msg);
     }
