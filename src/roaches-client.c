@@ -24,6 +24,7 @@ void sigintHandler(int signum) {
     free(packed_buffer);
     packed_buffer=NULL;
     ProtoCharMessage *recvm=NULL;
+    recvm = recvm;
     zmq_msg_t zmq_msg;
     zmq_msg_init (&zmq_msg);
 
