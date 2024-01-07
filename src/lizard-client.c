@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <time.h>
 #include <zmq.h>
 #include <ncurses.h>
 #include "message.pb-c.h"
@@ -72,9 +73,66 @@ void sigintHandler(int signum) {
     exit(signum);  
 }
 
-void *display (void *arg){
-    ProtoCharMessage m;
+void inactive() {
     
+    ProtoCharMessage m;
+    proto_char_message__init(&m); 
+    m.msg_type = 0;
+    m.ch=malloc(sizeof(char));
+    m.password=malloc(50*sizeof(char));
+    m.ch = &ch;
+    m.direction = 0;
+    strcpy(m.password, password);
+    
+
+    m.msg_type = 5;
+    size_t packed_size = proto_char_message__get_packed_size(&m);
+    uint8_t *packed_buffer = malloc(packed_size);
+    proto_char_message__pack(&m, packed_buffer);
+    zmq_send (requester, packed_buffer, packed_size, 0);
+    free(packed_buffer);
+    packed_buffer=NULL;
+    zmq_msg_t zmq_msg;
+    zmq_msg_init (&zmq_msg);
+    packed_size=zmq_recvmsg(requester, &zmq_msg,0);
+    packed_buffer = zmq_msg_data(&zmq_msg);
+    ProtoCharMessage *recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer);
+    proto_char_message__free_unpacked(recvm, NULL);
+    recvm=NULL;
+    while(1){
+    	int key = getch();
+
+        switch (key)
+        {
+        case KEY_LEFT:
+        case KEY_RIGHT:
+        case KEY_DOWN:
+        case KEY_UP:
+            mvprintw(33,0,"You were inactive for too long. \n Press q to exit the program\n");
+            break;
+        
+        case 'q':
+        case 'Q':
+            endwin();
+            free(candidate1);
+            zmq_close (requester);
+            zmq_close(subscriber);
+            zmq_ctx_destroy (context);
+            zmq_ctx_destroy(context2);
+            exit(0);
+            break;
+        
+        default:
+            key = 'x'; 
+            break;
+        }
+
+
+     
+    }
+}
+void *display (void *arg){
+    ProtoCharMessage m;    
     size_t packed_size;
     uint8_t* packed_buffer;
     ProtoDisplayMessage *recvm = NULL;
@@ -149,6 +207,7 @@ void *display (void *arg){
 
 int main(int argc, char *argv[])
 {
+    time_t inactive;
     signal(SIGINT, sigintHandler); /*log handler*/
     pthread_t threadController, threadDisplay;
     srand((unsigned int) time(NULL));
@@ -276,6 +335,7 @@ int main(int argc, char *argv[])
     m.msg_type = 1;
     m.ch = &ch;
     int key, score, n = 0;
+    inactive=0;
     while(1){
     	key = getch();	
         n++;
@@ -342,7 +402,11 @@ int main(int argc, char *argv[])
             recvm=proto_char_message__unpack(NULL, packed_size, packed_buffer); 
             proto_char_message__free_unpacked(recvm, NULL);
             recvm=NULL;
+            inactive=0;
             //mvprintw(1,0,"Score - %d", score);
+        }
+        if(inactive>=30){
+            inactive();         
         }
     }
     free(candidate1);
