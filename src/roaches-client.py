@@ -55,7 +55,7 @@ def main():
         exit(1)
 
     candidate1 = f"tcp://{ip}:{port1}"
-
+    
     context = zmq.Context()
     requester = context.socket(zmq.REQ)
     requester.connect(candidate1)
@@ -73,9 +73,11 @@ def main():
 
     password = ''.join(chr(random.randint(32, 125)) for _ in range(49))
     m.msg_type = 3
+    m.ch = "a"
     m.ncock = ncock
     m.password = password
-
+    m.direction = 1
+    m.cockdir.extend([0] * 10)
     suppress_sigint()
     packed_buffer = m.SerializeToString()
     requester.send(packed_buffer)
@@ -91,6 +93,7 @@ def main():
     m.msg_type = 4
 
     n = 0
+    SLEEPINGDIR=5
     while True:
         n += 1
         sleep_delay = random.randint(0, 699999)
@@ -109,7 +112,7 @@ def main():
                 m.cockdir[i] = direction
                 print(f"{n} Going {moves[direction]}")
             else:
-                m.cockdir[i] = 5
+                m.cockdir[i] = 1
                 print("A mimir")
 
         # send the movement message
